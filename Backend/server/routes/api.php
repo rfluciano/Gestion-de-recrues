@@ -138,6 +138,9 @@ Route::prefix('resource')->group(function () {
 
     // Import multiple resources in bulk
     Route::post('/import', [ResourceController::class, 'import']);
+
+    Route::get('/chief/{chiefId}', [ResourceController::class, 'getResourcesByChief']);
+
 });
 
 //---------------------REQUEST-------------------------//
@@ -166,6 +169,8 @@ Route::prefix('request')->group(function () {
 
     // Retrieve received requests by receiver ID
     Route::get('/received/{receiverId}', [RequestController::class, 'getReceivedRequests']);
+
+    Route::post('/bulk', [RequestController::class, 'handleRequests']);
 });
 
 //----------------------VALIDATION---------------------//

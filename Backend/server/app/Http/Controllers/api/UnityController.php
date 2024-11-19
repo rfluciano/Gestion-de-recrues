@@ -34,12 +34,31 @@ class UnityController extends Controller
         }
     }
 
-    // Get a list of all unities
     public function index()
     {
-        $unities = Unity::all();
-        return response()->json($unities);
+        // Eager load the 'parent' relationship
+        $unities = Unity::with('parent')->get();
+    
+        // Optionally format the data to include only the fields you want
+        $formattedUnities = $unities->map(function ($unity) {
+            return [
+                'id_unity' => $unity->id_unity,
+                'id_parent' => $unity->id_parent,
+                'type' => $unity->type,
+                'title' => $unity->title,
+                'created_at' => $unity->created_at,
+                'updated_at' => $unity->updated_at,
+                'parent' => $unity->parent ? [
+                    'id_unity' => $unity->parent->id_unity,
+                    'type' => $unity->parent->type,
+                    'title' => $unity->parent->title,
+                ] : null, // Include parent details or null if no parent
+            ];
+        });
+    
+        return response()->json($formattedUnities);
     }
+    
 
     // Update an existing unity
     public function update(Request $request, $id)

@@ -6,6 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Request as RequestModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
+use App\Models\Validation;
+use Illuminate\Support\Facades\DB;
+use App\Models\User; // Assuming this is the correct model
+
 
 class RequestController extends Controller
 {
@@ -159,4 +164,85 @@ class RequestController extends Controller
             return response()->json(['message' => 'Failed to retrieve received requests.', 'error' => $e->getMessage()], 500);
         }
     }
+
+
+
+    public function handleRequests(Request $request)
+    {
+        $requests = $request->input('requests'); // Array of resources with id_resource, id_receiver, id_requester
+        $responses = [];
+        
+        foreach ($requests as $requestData) {
+            $id_resource = $requestData['id_resource'];
+            $id_receiver = $requestData['id_receiver'];
+            $id_requester = $requestData['id_requester'];
+            
+            try {
+                // Start a transaction
+                DB::beginTransaction();
+    
+                // Check if id_receiver exists in the UserAccount table
+                if (!User::where('id_user', $id_receiver)->exists()) {
+                    throw new \Exception("Receiver ID $id_receiver does not exist in the UserAccount table.");
+                }
+    
+                // Insert the request and get the auto-incremented id_request
+                $id_request = DB::table('requests')->insertGetId([
+                    'id_resource' => $id_resource,
+                    'id_receiver' => $id_receiver,
+                    'id_requester' => $id_requester,
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ], 'id_request'); // specify 'id_request' as the auto-increment column
+    
+                // Prepare the response data
+                $responseData = [
+                    'id_resource' => $id_resource,
+                    'status' => 'success',
+                    'message' => 'Request created successfully'
+                ];
+    
+                // If self-approved (id_requester === id_receiver), create a validation record
+                if ($id_requester === $id_receiver) {
+                    Validation::create([
+                        'id_validator' => $id_requester,
+                        'id_request' => $id_request,
+                        'status' => 'Approved',
+                        'validation_date' => now(),
+                        'delivery_date' => now(),
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+    
+                    $responseData['id_request'] = $id_request; // Add id_request to the response for reference
+                }
+    
+                // Commit the transaction
+                DB::commit();
+    
+                $responses[] = $responseData;
+            } catch (\Exception $e) {
+                // Rollback transaction if there is an error
+                DB::rollBack();
+    
+                // Log the error details
+                Log::error("Failed to create request for resource ID {$id_resource}", [
+                    'id_resource' => $id_resource,
+                    'id_receiver' => $id_receiver,
+                    'id_requester' => $id_requester,
+                    'error_message' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+    
+                $responses[] = [
+                    'id_resource' => $id_resource,
+                    'status' => 'error',
+                    'message' => $e->getMessage()
+                ];
+            }
+        }
+        
+        return response()->json($responses);
+    }    
+    
 }

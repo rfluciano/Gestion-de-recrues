@@ -91,10 +91,11 @@ class ResourceController extends Controller
             'id_user_holder' => 'nullable|exists:useraccount,id_user',
             'id_user_chief' => 'required|exists:useraccount,id_user',
             'label' => 'required|string|max:255',
-            'access_login' => 'required|string|max:255',
-            'access_password' => 'required|string|max:255',
+            'access_login' => 'nullable|string|max:255',
+            'access_password' => 'nullable|string|max:255',
             'discriminator' => 'required|string',
-            'isavailable' => 'required|boolean'
+            'isavailable' => 'required|boolean',
+            'description' => 'nullable|string|max:255'
         ]);
 
         if ($validator->fails()) {
@@ -132,9 +133,10 @@ class ResourceController extends Controller
             'resources.*.id_user_holder' => 'nullable|exists:useraccount,id_user',
             'resources.*.id_user_chief' => 'required|exists:useraccount,id_user',
             'resources.*.label' => 'required|string|max:255',
-            'resources.*.access_login' => 'required|string|max:255',
-            'resources.*.access_password' => 'required|string|max:255',
+            'resources.*.access_login' => 'nullable|string|max:255',
+            'resources.*.access_password' => 'nullable|string|max:255',
             'resources.*.discriminator' => 'required|string',
+            'resources.*description' => 'nullable|string|max:255',
             'resources.*.isavailable' => 'required|boolean'
         ]);
 
@@ -152,4 +154,18 @@ class ResourceController extends Controller
         return response()->json(['message' => 'Resources imported successfully.', 'data' => $createdResources]);
     }
 
+    // Retrieve all resources managed by a specific chief
+    public function getResourcesByChief($chiefId)
+    {
+        try {
+            $resources = Resource::where('id_user_chief', $chiefId)
+                ->with(['holder', 'chief'])
+                ->get();
+
+            return response()->json($resources);
+        } catch (Exception $e) {
+            Log::error('Failed to retrieve resources by chief: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to retrieve resources by chief.', 'error' => $e->getMessage()], 500);
+        }
+    }
 }
