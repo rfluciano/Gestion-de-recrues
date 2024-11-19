@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Request as RequestModel;
-use App\Models\Validation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -16,8 +15,7 @@ class RequestController extends Controller
             $request->validate([
                 'id_requester' => 'nullable|integer|exists:useraccount,id_user',
                 'id_resource' => 'required|integer|exists:resources,id_resource',
-                'id_receiver' => 'required|integer',
-                'delivery_date' => 'nullable|date',
+                'id_receiver' => 'nullable|integer|exists:useraccount,id_user',
                 'request_date' => 'nullable|date',
             ]);
 
@@ -25,7 +23,6 @@ class RequestController extends Controller
                 'id_requester' => $request->id_requester,
                 'id_resource' => $request->id_resource,
                 'id_receiver' => $request->id_receiver,
-                'delivery_date' => $request->delivery_date,
                 'request_date' => $request->request_date,
             ]);
 
@@ -36,15 +33,17 @@ class RequestController extends Controller
         }
     }
 
-    // Get all requests with validation if exists
     public function index()
     {
         try {
-            $requests = RequestModel::with(['requester', 'resource'])
+            $requests = RequestModel::with(['requester', 'resource', 'receiver', 'validation'])
+                ->orderBy('updated_at', 'desc')
                 ->get()
                 ->map(function ($request) {
-                    $validation = Validation::where('id_request', $request->id)->first();
-                    $request->validation = $validation ?: null;
+                    // Set validation to null if it's the default empty model
+                    if ($request->validation && !$request->validation->exists) {
+                        $request->validation = null;
+                    }
                     return $request;
                 });
 
@@ -55,13 +54,15 @@ class RequestController extends Controller
         }
     }
 
-    // Get a single request by ID with validation if exists
     public function show($id)
     {
         try {
-            $request = RequestModel::with(['requester', 'resource'])->findOrFail($id);
-            $validation = Validation::where('id_request', $id)->first();
-            $request->validation = $validation ?: null;
+            $request = RequestModel::with(['requester', 'resource', 'validation'])->findOrFail($id);
+
+            // Set validation to null if it's the default empty model
+            if ($request->validation && !$request->validation->exists) {
+                $request->validation = null;
+            }
 
             return response()->json($request);
         } catch (\Exception $e) {
@@ -69,6 +70,7 @@ class RequestController extends Controller
             return response()->json(['message' => 'Failed to retrieve request.', 'error' => $e->getMessage()], 500);
         }
     }
+
 
     // Update an existing request
     public function update(Request $request, $id)
@@ -117,11 +119,44 @@ class RequestController extends Controller
     public function getByRequester($requesterId)
     {
         try {
-            $requests = RequestModel::where('id_requester', $requesterId)->with('requester', 'resource')->get();
+            $requests = RequestModel::where('id_requester', $requesterId)
+                ->with(['requester', 'resource', 'validation']) // Eager load validation
+                ->get();
+
             return response()->json($requests);
         } catch (\Exception $e) {
             Log::error('Failed to retrieve requests by requester: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to retrieve requests.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Get requests sent by a specific requester
+    public function getSentRequests($requesterId)
+    {
+        try {
+            $requests = RequestModel::where('id_requester', $requesterId)
+                ->with(['requester', 'resource', 'receiver', 'validation'])
+                ->get();
+
+            return response()->json($requests);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve sent requests: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to retrieve sent requests.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Get requests received by a specific receiver
+    public function getReceivedRequests($receiverId)
+    {
+        try {
+            $requests = RequestModel::where('id_receiver', $receiverId)
+                ->with(['requester', 'resource', 'receiver', 'validation'])
+                ->get();
+
+            return response()->json($requests);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve received requests: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to retrieve received requests.', 'error' => $e->getMessage()], 500);
         }
     }
 }

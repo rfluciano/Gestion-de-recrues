@@ -12,6 +12,7 @@ class CreatePositionsTable extends Migration
             $table->id('id_position');
             $table->foreignId('id_unity')->constrained('unities', 'id_unity')->onDelete('cascade'); // Assuming there's a Unity table
             $table->string('title')->nullable();
+            $table->boolean('isavailable');
             $table->timestamps();
         });
     }

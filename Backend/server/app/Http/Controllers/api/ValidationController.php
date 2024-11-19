@@ -7,6 +7,8 @@ use App\Models\Validation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use App\Models\Resource;
+use App\Models\RequestModel;
 
 class ValidationController extends Controller
 {
@@ -29,13 +31,13 @@ class ValidationController extends Controller
         }
     }
 
-    // Store a new validation
     public function create(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'id_validator' => 'required|integer|exists:useraccount,id_user',
             'id_request' => 'required|integer|exists:requests,id_request',
             'validation_date' => 'nullable|date',
+            'delivery_date' => 'nullable|date',
             'status' => 'required|string|max:50',
             'rejection_reason' => 'nullable|string',
         ]);
@@ -44,7 +46,22 @@ class ValidationController extends Controller
             return response()->json($validator->errors(), 400);
         }
 
+        // Create the validation
         $validation = Validation::create($request->all());
+
+        // Find the request and associated resource
+        $requestModel = RequestModel::find($request->id_request);
+        if ($requestModel && $requestModel->id_resource) {
+            $resource = Resource::find($requestModel->id_resource);
+            
+            if ($resource) {
+                // Update resource fields
+                $resource->isavailable = false;
+                $resource->date_attribution = now();
+                $resource->save();
+            }
+        }
+
         return response()->json(['message' => 'Validation created successfully!', 'validation' => $validation], 201);
     }
 

@@ -16,12 +16,14 @@ class PositionController extends Controller
             $request->validate([
                 'id_unity' => 'required|integer|exists:unities,id_unity', // Ensure the unity exists
                 'title' => 'required|string|max:255',
+                'isavailable' => 'required|boolean',
             ]);
 
             $position = Position::create([
                 'id_unity' => $request->id_unity,
                 'title' => $request->title,
-            ]);
+                'isavailable' => $request->isavailable, // Corrected here
+            ]);            
 
             return response()->json(['message' => 'Position created successfully!', 'position' => $position], 201);
         } catch (\Exception $e) {
@@ -44,6 +46,7 @@ class PositionController extends Controller
             $request->validate([
                 'id_unity' => 'sometimes|required|integer|exists:unities,id_unity',
                 'title' => 'sometimes|required|string|max:255',
+                'isavailable' => 'required|boolean',
             ]);
 
             $position = Position::findOrFail($id);
@@ -51,6 +54,8 @@ class PositionController extends Controller
             $position->update([
                 'id_unity' => $request->id_unity ?? $position->id_unity,
                 'title' => $request->title ?? $position->title,
+                'isavailable' => $request->isavailable ?? $position->isavailable,
+
             ]);
 
             return response()->json(['message' => 'Position updated successfully!', 'position' => $position]);

@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,23 +8,24 @@ class Position extends Model
 {
     use HasFactory;
 
-    // The table associated with the model
-    protected $table = 'positions';
+    protected $table = 'positions'; // Ensure correct table name
 
-    // Primary key
     protected $primaryKey = 'id_position';
 
-    // Mass assignable attributes
     protected $fillable = [
         'id_unity',
         'title',
+        'isavailable'
     ];
 
-    // Relationship to the Unity model (assuming a position belongs to a unity)
     public function unity()
     {
         return $this->belongsTo(Unity::class, 'id_unity', 'id_unity');
     }
 
-    
+    // Define the one-to-one relationship with Employee
+    public function employee()
+    {
+        return $this->hasOne(Employee::class, 'id_position', 'id_position');
+    }
 }

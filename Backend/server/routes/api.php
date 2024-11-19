@@ -48,6 +48,8 @@ Route::post('/receive', [PusherController::class, 'receive']);
 
 
 //----------------------EMPLOYEE-------------------------//
+
+
 // Route to create a new employee
 Route::post('/employee/new', [EmployeeController::class, 'create']);
 
@@ -59,6 +61,8 @@ Route::put('/employee/disable/{id}', [EmployeeController::class, 'disable']);
 
 // Route to fetch employees with optional filters
 Route::get('/employee/show', [EmployeeController::class, 'show']);
+
+Route::get('/employee/count', [EmployeeController::class, 'getEmployeeCounts']);
 
 // Route to get employee statistics
 Route::get('/employee/stats', [EmployeeController::class, 'stat']);
@@ -84,6 +88,9 @@ Route::delete('/unity/{id}', [UnityController::class, 'delete']);
 // Route to get a single unity by ID
 Route::get('/unity/{id}', [UnityController::class, 'show']);
 
+Route::get('/unity/position/{id}', [UnityController::class, 'getPosition']);
+
+
 // Route to get all unity IDs
 Route::get('/unity/ids', [UnityController::class, 'ids']);
 
@@ -94,7 +101,7 @@ Route::prefix('position')->group(function () {
     Route::post('/new', [PositionController::class, 'create']);
 
     // Get all positions
-    Route::get('/all', [PositionController::class, 'index']);
+    Route::get('', [PositionController::class, 'index']);
 
     // Get a specific position by ID
     Route::get('/{id}', [PositionController::class, 'show']);
@@ -110,11 +117,15 @@ Route::prefix('position')->group(function () {
 //----------------------RESOURCE-----------------------//
 
 Route::prefix('resource')->group(function () {
+
+    
     // Retrieve all resources
     Route::get('/', [ResourceController::class, 'index']);
 
     // Retrieve a specific resource by ID
     Route::get('/{id}', [ResourceController::class, 'show']);
+
+    Route::get('/count', [ResourceController::class, 'resourceCounts']);
 
     // Create a new resource
     Route::post('/new', [ResourceController::class, 'create']);
@@ -149,8 +160,13 @@ Route::prefix('request')->group(function () {
 
     // Retrieve requests by requester ID
     Route::get('/by-requester/{requesterId}', [RequestController::class, 'getByRequester']);
-});
 
+    // Retrieve sent requests by requester ID
+    Route::get('/sent/{requesterId}', [RequestController::class, 'getSentRequests']);
+
+    // Retrieve received requests by receiver ID
+    Route::get('/received/{receiverId}', [RequestController::class, 'getReceivedRequests']);
+});
 
 //----------------------VALIDATION---------------------//
 

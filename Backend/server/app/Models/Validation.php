@@ -15,7 +15,7 @@ class Validation extends Model
 
     protected $primaryKey = 'id_validation';
     public $incrementing = true;
-    public $timestamps = false;
+    public $timestamps = true;
 
     // The attributes that are mass assignable
     protected $fillable = [

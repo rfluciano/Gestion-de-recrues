@@ -5,7 +5,9 @@ namespace App\Http\Controllers\api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Unity;
+use App\Models\Position;
 use Illuminate\Support\Facades\Log;
+
 
 class UnityController extends Controller
 {
@@ -99,6 +101,23 @@ class UnityController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to retrieve unity ids: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to retrieve unity ids.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Get all positions where id_unity matches a specific ID
+    public function getPosition(Request $request, $id_unity)
+    {
+        try {
+            // Validate that id_unity exists in the unities table
+            $unity = Unity::findOrFail($id_unity);
+
+            // Retrieve all positions where id_unity matches the provided id
+            $positions = Position::where('id_unity', $id_unity)->get();
+
+            return response()->json(['positions' => $positions], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve positions for unity: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to retrieve positions.', 'error' => $e->getMessage()], 500);
         }
     }
 }

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class Employee extends Model
 {
@@ -20,9 +21,33 @@ class Employee extends Model
         'id_position',
         'name',
         'firstname',
-        'status',
+        'isactive',
         'date_entry',
     ];
+
+    public function getWeeklyEmployeeCount()
+    {
+        $startOfWeek = Carbon::now()->startOfWeek(); // Monday
+        $endOfWeek = Carbon::now()->endOfWeek(); // Sunday
+
+        return Employee::select(DB::raw('DATE(date_entry) as date'), DB::raw('COUNT(*) as count'))
+            ->whereBetween('date_entry', [$startOfWeek, $endOfWeek])
+            ->groupBy(DB::raw('DATE(date_entry)'))
+            ->get();
+    }
+
+    public function getMonthlyEmployeeCount()
+    {
+        $startOfYear = Carbon::now()->startOfYear();
+        $endOfYear = Carbon::now()->endOfYear();
+
+        return Employee::select(DB::raw('MONTH(date_entry) as month'), DB::raw('COUNT(*) as count'))
+            ->whereBetween('date_entry', [$startOfYear, $endOfYear])
+            ->groupBy(DB::raw('MONTH(date_entry)'))
+            ->get();
+    }
+
+
 
     // Define the relationship with the User model
     public function user()

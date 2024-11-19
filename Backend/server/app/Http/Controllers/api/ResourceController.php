@@ -5,7 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Models\Resource;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
+use Exception;
 use Illuminate\Support\Facades\Validator;
+
 
 class ResourceController extends Controller
 {
@@ -15,6 +19,63 @@ class ResourceController extends Controller
         $resources = Resource::with(['holder', 'chief'])->get();
         return response()->json($resources);
     }
+
+    // Function to get weekly, monthly, and yearly counts of resources with id_user_holder
+    public function resourceCounts()
+    {
+        try {
+            // Weekly resource count for the current week (Monday to Sunday)
+            $startOfWeek = Carbon::now()->startOfWeek();
+            $endOfWeek = Carbon::now()->endOfWeek();
+
+            // Fix: Ensure we use a valid alias for the count field
+            $weeklyCounts = Resource::select(DB::raw('DATE(date_attribution) as date'), DB::raw('COUNT(*) as resource_count'))
+                ->whereNotNull('id_user_holder')
+                ->whereBetween('date_attribution', [$startOfWeek, $endOfWeek])
+                ->groupBy(DB::raw('DATE(date_attribution)'))
+                ->get()
+                ->mapWithKeys(function ($item) {
+                    // Convert date to a weekday name (e.g., 'Mon' or 'Lundi')
+                    $dayName = Carbon::parse($item->date)->locale('fr')->isoFormat('ddd'); // French short day name
+                    return ["$dayName: {$item->resource_count}"];
+                });
+
+            // Monthly resource count for the current year (January to December)
+            $startOfYear = Carbon::now()->startOfYear();
+            $endOfYear = Carbon::now()->endOfYear();
+
+            $monthlyCounts = Resource::select(DB::raw("TO_CHAR(date_attribution, 'Month') as month"), DB::raw('COUNT(*) as resource_count'))
+                ->whereNotNull('id_user_holder')
+                ->whereBetween('date_attribution', [$startOfYear, $endOfYear])
+                ->groupBy(DB::raw("TO_CHAR(date_attribution, 'Month')"))
+                ->get()
+                ->mapWithKeys(function ($item) {
+                    return [trim($item->month) => $item->resource_count];
+                });
+
+            // Yearly resource count for each year
+            $yearlyCounts = Resource::select(DB::raw("EXTRACT(YEAR FROM date_attribution) as year"), DB::raw('COUNT(*) as resource_count'))
+                ->whereNotNull('id_user_holder')
+                ->groupBy(DB::raw("EXTRACT(YEAR FROM date_attribution)"))
+                ->get()
+                ->mapWithKeys(function ($item) {
+                    return [$item->year => $item->resource_count];
+                });
+
+            return response()->json([
+                'weekly_counts' => $weeklyCounts,
+                'monthly_counts' => $monthlyCounts,
+                'yearly_counts' => $yearlyCounts,
+            ], 200);
+        } catch (Exception $e) {
+            Log::error('Failed to fetch resource counts: ' . $e->getMessage(), [
+                'error' => $e,
+            ]);
+
+            return response()->json(['message' => 'Failed to fetch resource counts.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
 
     // Retrieve a specific resource by ID
     public function show($id)
@@ -32,7 +93,8 @@ class ResourceController extends Controller
             'label' => 'required|string|max:255',
             'access_login' => 'required|string|max:255',
             'access_password' => 'required|string|max:255',
-            'discriminator' => 'required|string'
+            'discriminator' => 'required|string',
+            'isavailable' => 'required|boolean'
         ]);
 
         if ($validator->fails()) {
@@ -67,12 +129,13 @@ class ResourceController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'resources' => 'required|array',
-            'resources.*.id_user_holder' => 'required|exists:useraccount,id_user',
+            'resources.*.id_user_holder' => 'nullable|exists:useraccount,id_user',
             'resources.*.id_user_chief' => 'required|exists:useraccount,id_user',
             'resources.*.label' => 'required|string|max:255',
             'resources.*.access_login' => 'required|string|max:255',
             'resources.*.access_password' => 'required|string|max:255',
-            'resources.*.discriminator' => 'required|string'
+            'resources.*.discriminator' => 'required|string',
+            'resources.*.isavailable' => 'required|boolean'
         ]);
 
         if ($validator->fails()) {
@@ -88,4 +151,5 @@ class ResourceController extends Controller
 
         return response()->json(['message' => 'Resources imported successfully.', 'data' => $createdResources]);
     }
+
 }

@@ -12,7 +12,7 @@ class Resource extends Model
     protected $table = 'resources';
     protected $primaryKey = 'id_resource';
     public $incrementing = true;
-    public $timestamps = false;
+    public $timestamps = true;
 
     protected $fillable = [
         'id_user_holder',
@@ -20,7 +20,10 @@ class Resource extends Model
         'label',
         'access_login',
         'access_password',
-        'discriminator'
+        'discriminator',
+        'isavailable',
+        'date_attribution',
+        'description'
     ];
 
     /**

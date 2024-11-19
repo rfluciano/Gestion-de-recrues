@@ -8,54 +8,121 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Log; // Import the Log facade
 use Exception;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use App\Models\Position; // Import Position model at the top if not already done
+
+
 
 class EmployeeController extends Controller
 {
-    // Function to create a new employee
-    public function create(Request $request)
+
+public function create(Request $request)
+{
+    try {
+        // Validate incoming request data
+        $request->validate([
+            'id_user' => 'nullable|integer|exists:useraccount,id_user|unique:employees,id_user',
+            'id_position' => 'integer|exists:positions,id_position',
+            'name' => 'required|string|max:255',
+            'firstname' => 'required|string|max:255',
+            'isactive' => 'required|boolean',
+            'date_entry' => 'required|date',
+        ]);
+
+        // Create a new employee instance
+        $employee = new Employee();
+        $employee->id_user = $request->id_user;
+        $employee->id_position = $request->id_position;
+        $employee->name = $request->name;
+        $employee->firstname = $request->firstname;
+        $employee->isactive = $request->isactive;
+        $employee->date_entry = $request->date_entry;
+
+        // Generate a unique matricule based on the date_entry year
+        $yearFromDateEntry = Carbon::parse($request->date_entry)->format('Y');
+        $employee->matricule = $this->generateUniqueMatricule($yearFromDateEntry);
+
+        // Save the employee
+        $employee->save();
+
+        // Update the isavailable field for the position
+        $position = Position::find($request->id_position);
+        if ($position) {
+            $position->isavailable = false;
+            $position->save();
+        }
+
+        return response()->json(['message' => 'Employee created successfully!', 'Matricule' => $employee->matricule], 201);
+    } catch (Exception $e) {
+        // Log the error message
+        Log::error('Employee creation failed: ' . $e->getMessage(), [
+            'request' => $request->all(),
+            'error' => $e,
+        ]);
+
+        if (Employee::where('id_position', $request->id_position)->exists()) {
+            return response()->json(['message' => 'This position is already assigned to another employee.'], 422);
+        }        
+        // Return an error response
+        return response()->json(['message' => 'Failed to create employee.', 'error' => $e->getMessage()], 500);
+    }
+}
+
+
+
+    public function getEmployeeCounts()
     {
         try {
-            // Validate incoming request data
-            $request->validate([
-                'id_user' => 'nullable|integer|exists:useraccount,id_user|unique:employees,id_user', // Ensure id_user is unique
-                'id_position' => 'integer|exists:positions,id_position',
-                'name' => 'required|string|max:255',
-                'firstname' => 'required|string|max:255',
-                'status' => 'required|string|max:255',
-                'date_entry' => 'required|date',
-            ]);
-
-            // Create a new employee instance
-            $employee = new Employee();
-            $employee->id_user = $request->id_user;
-            $employee->id_position = $request->id_position;
-            $employee->name = $request->name;
-            $employee->firstname = $request->firstname;
-            $employee->status = $request->status;
-            $employee->date_entry = $request->date_entry;
-
-            // Extract the year from date_entry
-            $yearFromDateEntry = Carbon::parse($request->date_entry)->format('Y');
-
-            // Generate a unique matricule based on the year from date_entry
-            $employee->matricule = $this->generateUniqueMatricule($yearFromDateEntry);
-
-            // Save the employee
-            $employee->save();
-
-            // Return a response
-            return response()->json(['message' => 'Employee created successfully!', 'Matricule' => $employee->matricule], 201);
+            // Weekly employee count for the current week (Monday to Sunday)
+            $startOfWeek = Carbon::now()->startOfWeek();
+            $endOfWeek = Carbon::now()->endOfWeek();
+            
+            $weeklyCounts = Employee::select(DB::raw('DATE(date_entry) as date'), DB::raw('COUNT(*) as count'))
+            ->whereBetween('date_entry', [$startOfWeek, $endOfWeek])
+            ->groupBy(DB::raw('DATE(date_entry)'))
+            ->get()
+            ->mapWithKeys(function ($item) {
+                // Convert date to a weekday name (e.g., 'Mon' or 'Lundi')
+                $dayName = Carbon::parse($item->date)->locale('fr')->isoFormat('ddd'); // French short day name
+                return ["$dayName: {$item->count}"];
+            });
+    
+            // Monthly employee count for the current year (January to December)
+            $startOfYear = Carbon::now()->startOfYear();
+            $endOfYear = Carbon::now()->endOfYear();
+            
+            $monthlyCounts = Employee::select(DB::raw("TO_CHAR(date_entry, 'Month') as month"), DB::raw('COUNT(*) as count'))
+                ->whereBetween('date_entry', [$startOfYear, $endOfYear])
+                ->groupBy(DB::raw("TO_CHAR(date_entry, 'Month')"))
+                ->get()
+                ->mapWithKeys(function ($item) {
+                    return [trim($item->month) => $item->count];
+                });
+    
+            // Yearly employee count for each year
+            $yearlyCounts = Employee::select(DB::raw("EXTRACT(YEAR FROM date_entry) as year"), DB::raw('COUNT(*) as count'))
+                ->groupBy(DB::raw("EXTRACT(YEAR FROM date_entry)"))
+                ->get()
+                ->mapWithKeys(function ($item) {
+                    return [$item->year => $item->count];
+                });
+    
+            return response()->json([
+                'weekly_counts' => $weeklyCounts,
+                'monthly_counts' => $monthlyCounts,
+                'yearly_counts' => $yearlyCounts,
+            ], 200);
         } catch (Exception $e) {
-            // Log the error message
-            Log::error('Employee creation failed: ' . $e->getMessage(), [
-                'request' => $request->all(), // Log the request data for debugging
+            Log::error('Failed to fetch employee counts: ' . $e->getMessage(), [
                 'error' => $e,
             ]);
-
-            // Return an error response
-            return response()->json(['message' => 'Failed to create employee.', 'error' => $e->getMessage()], 500);
+    
+            return response()->json(['message' => 'Failed to fetch employee counts.', 'error' => $e->getMessage()], 500);
         }
     }
+    
+
+
 
     // Function to generate a unique matricule based on the given year
     private function generateUniqueMatricule($year)
@@ -87,8 +154,8 @@ class EmployeeController extends Controller
             $employees = Employee::when($request->id_position, function($query) use ($request) {
                     return $query->where('id_position', $request->id_position);
                 })
-                ->when($request->status, function($query) use ($request) {
-                    return $query->where('status', $request->status);
+                ->when($request->isactive, function($query) use ($request) {
+                    return $query->where('isactive', $request->isactive);
                 })
                 ->get();
 
@@ -111,7 +178,7 @@ class EmployeeController extends Controller
                 'id_position' => 'integer|exists:positions,id_position',
                 'name' => 'string|max:255',
                 'firstname' => 'string|max:255',
-                'status' => 'string|max:255',
+                'isactive' => 'boolean',
                 'date_entry' => 'date',
             ]);
 
@@ -123,7 +190,7 @@ class EmployeeController extends Controller
             $employee->id_position = $request->id_position ?? $employee->id_position;
             $employee->name = $request->name ?? $employee->name;
             $employee->firstname = $request->firstname ?? $employee->firstname;
-            $employee->status = $request->status ?? $employee->status;
+            $employee->isactive = $request->isactive ?? $employee->isactive;
             $employee->date_entry = $request->date_entry ?? $employee->date_entry;
 
             // Save the updated employee information
@@ -147,7 +214,7 @@ class EmployeeController extends Controller
             $employee = Employee::findOrFail($id);
 
             // Update employee status to 'disabled'
-            $employee->status = 'disabled';
+            $employee->isactive = false;
             $employee->save();
 
             return response()->json(['message' => 'Employee disabled successfully!'], 200);
@@ -238,8 +305,8 @@ class EmployeeController extends Controller
                 ->when($request->id_position, function ($query) use ($request) {
                     return $query->where('id_position', $request->id_position);
                 })
-                ->when($request->status, function ($query) use ($request) {
-                    return $query->where('status', $request->status);
+                ->when($request->isactive, function ($query) use ($request) {
+                    return $query->where('isactive', $request->isactive);
                 })
                 ->get();
     

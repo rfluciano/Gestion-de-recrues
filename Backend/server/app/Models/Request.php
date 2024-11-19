@@ -11,14 +11,13 @@ class Request extends Model
     // Define the primary key
     protected $primaryKey = 'id_request';
     public $incrementing = true;
-    public $timestamps = false;
+    public $timestamps = true;
 
     // Allow mass assignment for the following fields
     protected $fillable = [
         'id_requester',
         'id_resource',
         'id_receiver',
-        'delivery_date',
         'request_date',
     ];
 
@@ -28,6 +27,11 @@ class Request extends Model
     public function requester()
     {
         return $this->belongsTo(User::class, 'id_requester', 'id_user')->withDefault();
+    }
+
+    public function receiver()
+    {
+        return $this->belongsTo(User::class, 'id_receiver', 'id_user')->withDefault();
     }
 
     /**
@@ -46,11 +50,9 @@ class Request extends Model
         return $query->where('request_date', $date);
     }
 
-    /**
-     * Scope for filtering by delivery date.
-     */
-    public function scopeByDeliveryDate($query, $date)
+    public function validation()
     {
-        return $query->where('delivery_date', $date);
+        return $this->hasOne(Validation::class, 'id_request', 'id_request')->withDefault();
     }
+
 }
