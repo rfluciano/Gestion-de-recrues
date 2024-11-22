@@ -139,4 +139,74 @@ class UnityController extends Controller
             return response()->json(['message' => 'Failed to retrieve positions.', 'error' => $e->getMessage()], 500);
         }
     }
+
+        // Search unities by type, title, or other fields
+    public function search(Request $request)
+    {
+        try {
+            // Validate search inputs
+            $request->validate([
+                'type' => 'nullable|string|max:255',
+                'title' => 'nullable|string|max:255',
+            ]);
+
+            // Build the query
+            $query = Unity::query();
+
+            if ($request->filled('type')) {
+                $query->where('type', 'like', '%' . $request->type . '%');
+            }
+
+            if ($request->filled('title')) {
+                $query->where('title', 'like', '%' . $request->title . '%');
+            }
+
+            // Execute the query and fetch results
+            $results = $query->get();
+
+            return response()->json(['message' => 'Search completed successfully!', 'results' => $results]);
+        } catch (\Exception $e) {
+            Log::error('Search failed: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to complete search.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Advanced search including parent relationships
+    public function advancedSearch(Request $request)
+    {
+        try {
+            // Validate inputs
+            $request->validate([
+                'type' => 'nullable|string|max:255',
+                'title' => 'nullable|string|max:255',
+                'parent_title' => 'nullable|string|max:255',
+            ]);
+
+            // Build the query with parent relationships
+            $query = Unity::query()->with('parent');
+
+            if ($request->filled('type')) {
+                $query->where('type', 'like', '%' . $request->type . '%');
+            }
+
+            if ($request->filled('title')) {
+                $query->where('title', 'like', '%' . $request->title . '%');
+            }
+
+            if ($request->filled('parent_title')) {
+                $query->whereHas('parent', function ($q) use ($request) {
+                    $q->where('title', 'like', '%' . $request->parent_title . '%');
+                });
+            }
+
+            // Execute the query and fetch results
+            $results = $query->get();
+
+            return response()->json(['message' => 'Advanced search completed successfully!', 'results' => $results]);
+        } catch (\Exception $e) {
+            Log::error('Advanced search failed: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to complete advanced search.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
 }

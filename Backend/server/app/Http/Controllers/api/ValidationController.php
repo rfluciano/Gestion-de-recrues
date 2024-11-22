@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use App\Models\Resource;
-use App\Models\RequestModel;
+use App\Models\Request as RequestModel;
 use Carbon\Carbon;
 
 class ValidationController extends Controller
@@ -35,7 +35,7 @@ class ValidationController extends Controller
     public function create(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'id_validator' => 'required|integer|exists:useraccount,id_user',
+            'id_validator' => 'required|string|exists:useraccount,matricule',
             'id_request' => 'required|integer|exists:requests,id_request',
             'validation_date' => 'nullable|date',
             'delivery_date' => 'nullable|date',
@@ -73,7 +73,7 @@ class ValidationController extends Controller
             $validation = Validation::findOrFail($id);
 
             $validator = Validator::make($request->all(), [
-                'id_validator' => 'nullable|integer|exists:useraccount,id_user',
+                'id_validator' => 'nullable|string|exists:useraccount,matricule',
                 'id_request' => 'nullable|integer|exists:requests,id_request',
                 'validation_date' => 'nullable|date',
                 'status' => 'nullable|string|max:50',

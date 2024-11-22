@@ -10,7 +10,7 @@ class CreateValidationsTable extends Migration
     {
         Schema::create('validations', function (Blueprint $table) {
             $table->id('id_validation'); // Auto-incrementing primary key
-            $table->foreignId('id_validator')->constrained('useraccount', 'id_user')->onDelete('cascade'); // Foreign key to User
+            $table->string('id_validator')->constrained('useraccount', 'matricule')->onDelete('cascade'); // Foreign key to User
             $table->foreignId('id_request')->constrained('requests', 'id_request')->onDelete('cascade');
             $table->date('delivery_date')->nullable(); // Date for delivery
             $table->date('validation_date'); // Date of validation

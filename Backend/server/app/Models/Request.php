@@ -15,23 +15,27 @@ class Request extends Model
 
     // Allow mass assignment for the following fields
     protected $fillable = [
-        'id_requester',
-        'id_resource',
-        'id_receiver',
-        'request_date',
+        'id_requester',     // Chef d'unité qui crée la requête
+        'id_beneficiary',   // Employé qui recevra la ressource
+        'id_resource',      // Ressource demandée
+        'id_receiver',      // Chef responsable de la ressource
+        'request_date',     // Date de la requête
     ];
 
     /**
-     * Get the requester (user) who made the request.
+     * Get the requester (chef d'unité).
      */
     public function requester()
     {
-        return $this->belongsTo(User::class, 'id_requester', 'id_user')->withDefault();
+        return $this->belongsTo(User::class, 'id_requester', 'matricule')->withDefault();
     }
 
-    public function receiver()
+    /**
+     * Get the beneficiary (employé qui recevra la ressource).
+     */
+    public function beneficiary()
     {
-        return $this->belongsTo(User::class, 'id_receiver', 'id_user')->withDefault();
+        return $this->belongsTo(Employee::class, 'id_beneficiary', 'matricule')->withDefault();
     }
 
     /**
@@ -43,6 +47,14 @@ class Request extends Model
     }
 
     /**
+     * Get the receiver (chef responsable de la ressource).
+     */
+    public function receiver()
+    {
+        return $this->belongsTo(User::class, 'id_receiver', 'matricule')->withDefault();
+    }
+
+    /**
      * Scope for filtering by request date.
      */
     public function scopeByRequestDate($query, $date)
@@ -50,9 +62,11 @@ class Request extends Model
         return $query->where('request_date', $date);
     }
 
+    /**
+     * Get the validation associated with the request.
+     */
     public function validation()
     {
         return $this->hasOne(Validation::class, 'id_request', 'id_request')->withDefault();
     }
-
 }

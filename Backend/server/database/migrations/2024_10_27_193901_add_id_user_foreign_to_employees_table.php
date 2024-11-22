@@ -1,5 +1,4 @@
 <?php
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -8,10 +7,10 @@ class AddIdUserForeignToEmployeesTable extends Migration
 {
     public function up()
     {
-        Schema::table('employees', function (Blueprint $table) {
-            $table->unsignedBigInteger('id_user')->nullable(); // Define id_user as nullable
-            $table->foreign('id_user')
-                  ->references('id_user')
+        // Ajouter la contrainte de clé étrangère sur id_superior après la création de la table
+        Schema::table('useraccount', function (Blueprint $table) {
+            $table->foreign('id_superior')
+                  ->references('matricule')
                   ->on('useraccount')
                   ->onDelete('cascade');
         });
@@ -19,9 +18,9 @@ class AddIdUserForeignToEmployeesTable extends Migration
 
     public function down()
     {
-        Schema::table('employees', function (Blueprint $table) {
-            $table->dropForeign(['id_user']);
-            $table->dropColumn('id_user');
+        // Supprimer la contrainte de clé étrangère sur id_superior
+        Schema::table('useraccount', function (Blueprint $table) {
+            $table->dropForeign(['id_superior']);
         });
     }
 }

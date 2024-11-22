@@ -21,22 +21,23 @@ public function create(Request $request)
     try {
         // Validate incoming request data
         $request->validate([
-            'id_user' => 'nullable|integer|exists:useraccount,id_user|unique:employees,id_user',
-            'id_position' => 'integer|exists:positions,id_position',
+            // 'id_user' => 'nullable|integer|exists:useraccount,matricule|unique:employees,id_user',
+            'id_position' => 'integer|exists:positions,id_position|unique:employees,id_position', // Fix: Unique check for id_position
             'name' => 'required|string|max:255',
             'firstname' => 'required|string|max:255',
-            'isactive' => 'required|boolean',
+            'isequipped' => 'nullable|boolean', // Make isequipped nullable and optional
             'date_entry' => 'required|date',
         ]);
-
+        
         // Create a new employee instance
         $employee = new Employee();
-        $employee->id_user = $request->id_user;
+        // $employee->id_user = $request->id_user;
         $employee->id_position = $request->id_position;
         $employee->name = $request->name;
         $employee->firstname = $request->firstname;
-        $employee->isactive = $request->isactive;
+        $employee->isequipped = $request->isequipped ?? false; // Default to false if not provided
         $employee->date_entry = $request->date_entry;
+        
 
         // Generate a unique matricule based on the date_entry year
         $yearFromDateEntry = Carbon::parse($request->date_entry)->format('Y');
@@ -154,8 +155,8 @@ public function create(Request $request)
             $employees = Employee::when($request->id_position, function($query) use ($request) {
                     return $query->where('id_position', $request->id_position);
                 })
-                ->when($request->isactive, function($query) use ($request) {
-                    return $query->where('isactive', $request->isactive);
+                ->when($request->isequipped, function($query) use ($request) {
+                    return $query->where('isequipped', $request->isequipped);
                 })
                 ->get();
 
@@ -174,11 +175,11 @@ public function create(Request $request)
         try {
             // Validate incoming request data
             $request->validate([
-                'id_user' => 'integer|exists:useraccount,id_user', // Adjust if your user id column is named differently
+                // 'id_user' => 'integer|exists:useraccount,matricule', // Adjust if your user id column is named differently
                 'id_position' => 'integer|exists:positions,id_position',
                 'name' => 'string|max:255',
                 'firstname' => 'string|max:255',
-                'isactive' => 'boolean',
+                'isequipped' => 'boolean',
                 'date_entry' => 'date',
             ]);
 
@@ -186,11 +187,11 @@ public function create(Request $request)
             $employee = Employee::findOrFail($id);
 
             // Update employee attributes
-            $employee->id_user = $request->id_user ?? $employee->id_user;
+            // $employee->id_user = $request->id_user ?? $employee->id_user;
             $employee->id_position = $request->id_position ?? $employee->id_position;
             $employee->name = $request->name ?? $employee->name;
             $employee->firstname = $request->firstname ?? $employee->firstname;
-            $employee->isactive = $request->isactive ?? $employee->isactive;
+            $employee->isequipped = $request->isequipped ?? $employee->isequipped;
             $employee->date_entry = $request->date_entry ?? $employee->date_entry;
 
             // Save the updated employee information
@@ -214,7 +215,7 @@ public function create(Request $request)
             $employee = Employee::findOrFail($id);
 
             // Update employee status to 'disabled'
-            $employee->isactive = false;
+            $employee->isequipped = false;
             $employee->save();
 
             return response()->json(['message' => 'Employee disabled successfully!'], 200);
@@ -305,8 +306,8 @@ public function create(Request $request)
                 ->when($request->id_position, function ($query) use ($request) {
                     return $query->where('id_position', $request->id_position);
                 })
-                ->when($request->isactive, function ($query) use ($request) {
-                    return $query->where('isactive', $request->isactive);
+                ->when($request->isequipped, function ($query) use ($request) {
+                    return $query->where('isequipped', $request->isequipped);
                 })
                 ->get();
     
@@ -321,5 +322,38 @@ public function create(Request $request)
             return response()->json(['message' => 'Failed to retrieve employees.', 'error' => $e->getMessage()], 500);
         }
     }    
+
+    public function search(Request $request)
+    {
+        try {
+            // Validate the search query input
+            $request->validate([
+                'query' => 'required|string|max:255',
+            ]);
+
+            $query = $request->query;
+
+            // Search in all columns of the employees table
+            $employees = Employee::where(function ($q) use ($query) {
+                $q->Where('id_position', 'like', "%{$query}%")
+                ->orWhere('name', 'like', "%{$query}%")
+                ->orWhere('firstname', 'like', "%{$query}%")
+                ->orWhere('isequipped', 'like', "%{$query}%")
+                ->orWhere('date_entry', 'like', "%{$query}%")
+                ->orWhere('matricule', 'like', "%{$query}%");
+            })->get();
+
+            // Return the search results
+            return response()->json(['employees' => $employees], 200);
+        } catch (Exception $e) {
+            // Log the error and return a response
+            Log::error('Failed to search employees: ' . $e->getMessage(), [
+                'error' => $e,
+            ]);
+
+            return response()->json(['message' => 'Failed to search employees.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
 
 }

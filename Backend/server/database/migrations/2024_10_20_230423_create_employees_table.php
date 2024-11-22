@@ -16,7 +16,7 @@ class CreateEmployeesTable extends Migration
             $table->foreignId('id_position')->constrained('positions', 'id_position')->onDelete('cascade');
             $table->string('name')->nullable();
             $table->string('firstname')->nullable();
-            $table->boolean('isactive');
+            $table->boolean('isequipped');
             $table->date('date_entry');
         });
     }

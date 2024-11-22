@@ -90,4 +90,39 @@ class PositionController extends Controller
             return response()->json(['message' => 'Failed to retrieve position.', 'error' => $e->getMessage()], 500);
         }
     }
+
+
+    // Add this method to the PositionController class
+    public function search(Request $request)
+    {
+        try {
+            // Ensure a search query is provided
+            $query = $request->input('query');
+            if (!$query) {
+                return response()->json(['message' => 'No search query provided.'], 400);
+            }
+
+            // Perform a search across all columns
+            $positions = Position::where(function ($q) use ($query) {
+                    $q->where('id_position', 'like', "%$query%")
+                    ->orWhere('id_unity', 'like', "%$query%")
+                    ->orWhere('title', 'like', "%$query%")
+                    ->orWhere('isavailable', 'like', "%$query%")
+                    ->orWhereRaw("CAST(created_at AS CHAR) LIKE ?", ["%$query%"])
+                    ->orWhereRaw("CAST(updated_at AS CHAR) LIKE ?", ["%$query%"]);
+                })
+                ->get();
+
+            // Return the results
+            return response()->json(['positions' => $positions], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to perform search: ' . $e->getMessage(), [
+                'query' => $request->input('query'),
+                'error' => $e,
+            ]);
+
+            return response()->json(['message' => 'Failed to perform search.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
 }

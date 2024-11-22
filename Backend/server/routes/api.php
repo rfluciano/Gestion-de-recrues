@@ -56,6 +56,8 @@ Route::post('/employee/new', [EmployeeController::class, 'create']);
 // Route to update an employee by ID
 Route::put('/employee/update/{id}', [EmployeeController::class, 'update']);
 
+Route::get('/employee/search', [EmployeeController::class, 'search']);
+
 // Route to disable an employee by ID (instead of delete)
 Route::put('/employee/disable/{id}', [EmployeeController::class, 'disable']);
 
@@ -78,6 +80,8 @@ Route::post('/unity/new', [UnityController::class, 'create']);
 
 // Route to get a list of all unities
 Route::get('/unity', [UnityController::class, 'index']);
+
+Route::get('/unity/search', [UnityController::class, 'search']);
 
 // Route to update an existing unity
 Route::put('/unity/{id}', [UnityController::class, 'update']);
@@ -103,6 +107,8 @@ Route::prefix('position')->group(function () {
     // Get all positions
     Route::get('', [PositionController::class, 'index']);
 
+    Route::get('/search', [PositionController::class, 'search']);
+
     // Get a specific position by ID
     Route::get('/{id}', [PositionController::class, 'show']);
 
@@ -127,6 +133,7 @@ Route::prefix('resource')->group(function () {
 
     Route::get('/count', [ResourceController::class, 'resourceCounts']);
 
+    Route::get('/search', [ResourceController::class, 'search']);
     // Create a new resource
     Route::post('/new', [ResourceController::class, 'create']);
 
@@ -151,6 +158,9 @@ Route::prefix('request')->group(function () {
 
     // Retrieve all requests
     Route::get('/', [RequestController::class, 'index']);
+
+    // Research all requests
+    Route::get('/search', [RequestController::class, 'search']);
 
     // Retrieve a specific request by ID
     Route::get('/{id}', [RequestController::class, 'show']);

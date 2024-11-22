@@ -13,13 +13,14 @@ class User extends Authenticatable implements JWTSubject
     use Notifiable;
 
     protected $table = 'useraccount';
-    protected $primaryKey = 'id_user';
-    public $incrementing = true; // Disable auto-incrementing
+    protected $primaryKey = 'matricule';
+    public $incrementing = false; // Disable auto-incrementing
     public $timestamps = false;
+    protected $keyType = 'string';      // Type de la clé primaire
 
     protected $fillable = [
         'matricule', // Include id_user in fillable to allow mass assignment
-        'email',
+        'username',
         'password',
         'isactive',
         'discriminator',
@@ -39,17 +40,17 @@ class User extends Authenticatable implements JWTSubject
 
     public function subAccounts()
     {
-        return $this->hasMany(UserAccount::class, 'id_superior', 'id_user');
+        return $this->hasMany(UserAccount::class, 'id_superior', 'matricule');
     }
 
     public function Manage_resource()
     {
-        return $this->hasMany(Resource::class, 'id_user_chief', 'id_user');
+        return $this->hasMany(Resource::class, 'id_user_chief', 'matricule');
     }
 
     public function Possess_resource()
     {
-        return $this->hasMany(Resource::class, 'id_user_holder', 'id_user');
+        return $this->hasMany(Resource::class, 'id_user_holder', 'matricule');
     }
 
 
@@ -83,6 +84,13 @@ class User extends Authenticatable implements JWTSubject
     public function getJWTIdentifier()
     {
         return $this->getKey(); // Usually the primary key
+    }
+
+    public function findForPassport($identifier)
+    {
+        return $this->where('username', $identifier)
+                    ->orWhere('matricule', $identifier)
+                    ->first();
     }
 
     /**

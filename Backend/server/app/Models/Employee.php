@@ -14,14 +14,15 @@ class Employee extends Model
     protected $table = 'employees'; // Ensure the table name matches your database
     protected $primaryKey = 'matricule';
     public $incrementing = false; // Matricule is not auto-incrementing in the database
-    public $timestamps = false; // Assuming you are not using created_at/updated_at timestamps
+    public $timestamps = false;
+    protected $keyType = 'string';      // Type de la clé primaire
+    // Assuming you are not using created_at/updated_at timestamps
 
     protected $fillable = [
-        'id_user',
         'id_position',
         'name',
         'firstname',
-        'isactive',
+        'isequipped',
         'date_entry',
     ];
 
@@ -47,20 +48,16 @@ class Employee extends Model
             ->get();
     }
 
-
-
-    // Define the relationship with the User model
-    public function user()
-    {
-        return $this->belongsTo(User::class, 'id_user');
-    }
-
     // Define the relationship with the Position model
     public function position()
     {
         return $this->belongsTo(Position::class, 'id_position');
     }
 
+    public function resource()
+    {
+        return $this->hasMany(Resource::class, 'id_resource');
+    }
     // Override the save method to customize Matricule generation
     public function save(array $options = [])
     {

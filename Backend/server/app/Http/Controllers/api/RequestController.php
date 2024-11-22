@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Request as RequestModel;
+use App\Models\Resource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -18,46 +19,66 @@ class RequestController extends Controller
     {
         try {
             $request->validate([
-                'id_requester' => 'nullable|integer|exists:useraccount,id_user',
-                'id_resource' => 'required|integer|exists:resources,id_resource',
-                'id_receiver' => 'nullable|integer|exists:useraccount,id_user',
+                'id_requester' => 'nullable|string|exists:useraccount,matricule',
+                'id_resource' => [
+                    'required',
+                    'integer',
+                    'unique:requests,id_resource', // Ensure the resource is unique in the requests table
+                    'exists:resources,id_resource' // Ensure the resource exists in the resources table
+                ],
+                'id_beneficiary' => 'nullable|string|exists:employees,matricule',
                 'request_date' => 'nullable|date',
             ]);
-
+    
+            // Retrieve the id_receiver dynamically based on the id_user_chief of the resource
+            $resource = Resource::find($request->id_resource);
+            if (!$resource) {
+                return response()->json(['message' => 'Resource not found.'], 404);
+            }
+    
+            $id_receiver = $resource->id_user_chief;
+    
+            // Create the new request
             $newRequest = RequestModel::create([
                 'id_requester' => $request->id_requester,
                 'id_resource' => $request->id_resource,
-                'id_receiver' => $request->id_receiver,
+                'id_beneficiary' => $request->id_beneficiary,
+                'id_receiver' => $id_receiver, // Use the dynamically fetched id_receiver
                 'request_date' => $request->request_date,
             ]);
-
+    
             return response()->json(['message' => 'Request created successfully!', 'request' => $newRequest], 201);
         } catch (\Exception $e) {
             Log::error('Failed to create request: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to create request.', 'error' => $e->getMessage()], 500);
         }
     }
+    
 
     public function index()
-    {
-        try {
-            $requests = RequestModel::with(['requester', 'resource', 'receiver', 'validation'])
-                ->orderBy('updated_at', 'desc')
-                ->get()
-                ->map(function ($request) {
-                    // Set validation to null if it's the default empty model
-                    if ($request->validation && !$request->validation->exists) {
-                        $request->validation = null;
-                    }
-                    return $request;
-                });
+{
+    try {
+        $requests = RequestModel::with(['requester', 'resource', 'receiver', 'validation', 'beneficiary'])
+            ->orderBy('updated_at', 'desc')
+            ->get()
+            ->map(function ($request) {
+                // Vérifier et convertir matricule en chaîne de caractères
+                $request->requester->matricule = (string) $request->requester->matricule;
+                $request->receiver->matricule = (string) $request->receiver->matricule;
+                // Set validation to null if it's the default empty model
+                if ($request->validation && !$request->validation->exists) {
+                    $request->validation = null;
+                }
+                return $request;
+            });
 
-            return response()->json($requests);
-        } catch (\Exception $e) {
-            Log::error('Failed to retrieve requests: ' . $e->getMessage());
-            return response()->json(['message' => 'Failed to retrieve requests.', 'error' => $e->getMessage()], 500);
-        }
+        return response()->json($requests);
+    } catch (\Exception $e) {
+        Log::error('Failed to retrieve requests: ' . $e->getMessage());
+        return response()->json(['message' => 'Failed to retrieve requests.', 'error' => $e->getMessage()], 500);
     }
+}
+
 
     public function show($id)
     {
@@ -82,7 +103,7 @@ class RequestController extends Controller
     {
         try {
             $request->validate([
-                'id_requester' => 'nullable|integer|exists:useraccount,id_user',
+                'id_requester' => 'nullable|string|exists:useraccount,matricule',
                 'id_resource' => 'nullable|integer|exists:resources,id_resource',
                 'id_receiver' => 'nullable|string',
                 'delivery_date' => 'nullable|date',
@@ -182,7 +203,7 @@ class RequestController extends Controller
                 DB::beginTransaction();
     
                 // Check if id_receiver exists in the UserAccount table
-                if (!User::where('id_user', $id_receiver)->exists()) {
+                if (!User::where('matricule', $id_receiver)->exists()) {
                     throw new \Exception("Receiver ID $id_receiver does not exist in the UserAccount table.");
                 }
     
@@ -243,6 +264,65 @@ class RequestController extends Controller
         }
         
         return response()->json($responses);
-    }    
+    } 
     
+    // Add this method to the RequestController class
+    public function search(Request $request)
+{
+    try {
+        $query = $request->input('query');
+
+        // Validate query input
+        if (!$query) {
+            try {
+                $requests = RequestModel::with(['requester', 'resource', 'receiver', 'validation'])
+                    ->orderBy('updated_at', 'desc')
+                    ->get()
+                    ->map(function ($request) {
+                        // Set validation to null if it's the default empty model
+                        if ($request->validation && !$request->validation->exists) {
+                            $request->validation = null;
+                        }
+                        return $request;
+                    });
+
+                return response()->json($requests);
+            } catch (\Exception $e) {
+                Log::error('Failed to retrieve requests: ' . $e->getMessage());
+                return response()->json(['message' => 'Failed to retrieve requests.', 'error' => $e->getMessage()], 500);
+            }
+        }
+
+        // Convert query to lowercase
+        $query = strtolower($query);
+
+        // Search logic
+        $results = RequestModel::with(['requester', 'resource', 'receiver', 'validation'])
+            ->where(function ($q) use ($query) {
+                $q->whereRaw('LOWER(CAST(id_request AS TEXT)) LIKE ?', ["%$query%"])
+                    ->orWhereHas('resource', function ($resourceQuery) use ($query) {
+                        $resourceQuery->whereRaw('LOWER(label) LIKE ?', ["%$query%"]);
+                    })
+                    ->orWhereHas('receiver', function ($receiverQuery) use ($query) {
+                        $receiverQuery->whereRaw('LOWER(matricule) LIKE ?', ["%$query%"]);
+                    })
+                    ->orWhereHas('validation', function ($validationQuery) use ($query) {
+                        $validationQuery->whereRaw('LOWER(status) LIKE ?', ["%$query%"])
+                            ->orWhereRaw('LOWER(rejection_reason) LIKE ?', ["%$query%"])
+                            ->orWhereRaw("CAST(validation_date AS TEXT) LIKE ?", ["%$query%"])
+                            ->orWhereRaw("CAST(delivery_date AS TEXT) LIKE ?", ["%$query%"]);
+                    });
+            })
+            ->orderBy('updated_at', 'desc')
+            ->get();
+
+        return response()->json($results, 200);
+    } catch (\Exception $e) {
+        Log::error('Failed to perform search in requests table: ' . $e->getMessage());
+        return response()->json(['message' => 'Failed to perform search.', 'error' => $e->getMessage()], 500);
+    }
+}
+
+
+
 }
