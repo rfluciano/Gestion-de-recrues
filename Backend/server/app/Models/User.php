@@ -24,7 +24,6 @@ class User extends Authenticatable implements JWTSubject
         'password',
         'isactive',
         'discriminator',
-        'id_superior',
         'remember_me'
     ];
 
@@ -37,11 +36,6 @@ class User extends Authenticatable implements JWTSubject
         'isactive' => false,
         'discriminator' => 'unitychief'
     ];
-
-    public function subAccounts()
-    {
-        return $this->hasMany(UserAccount::class, 'id_superior', 'matricule');
-    }
 
     public function Manage_resource()
     {

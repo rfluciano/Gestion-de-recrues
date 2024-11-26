@@ -18,14 +18,12 @@ class Resource extends Model
         'id_user_holder',
         'id_user_chief',
         'label',
-        'access_login',
-        'access_password',
         'discriminator',
         'isavailable',
         'date_attribution',
         'description'
     ];
-
+    
     /**
      * Get the user that owns the Resource
      *

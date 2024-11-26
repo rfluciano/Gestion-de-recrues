@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use App\Models\Resource;
+use App\Models\Notification;
 use App\Models\Request as RequestModel;
 use Carbon\Carbon;
 
@@ -47,23 +48,56 @@ class ValidationController extends Controller
             return response()->json($validator->errors(), 400);
         }
 
-        // Create the validation
+        // Créez la validation
         $validation = Validation::create($request->all());
 
-        // Find the request and associated resource
+        // Trouver la requête associée et la ressource concernée
         $requestModel = RequestModel::find($request->id_request);
+        // Individual notifications for requester and receiver
+        $this->createNotification($request->id_validator, 'Vous avez traité la requête avec succès.', [$request->id_validator]);
+        $this->createNotification($requestModel->id_requester, 'Votre requête de ressource a été approvée avec succès.', [$requestModel->id_request]);
+        
         if ($requestModel && $requestModel->id_resource) {
             $resource = Resource::find($requestModel->id_resource);
-            
+
             if ($resource) {
-                // Update resource fields
-                $resource->isavailable = false;
+                // Mettre à jour les champs de la ressource
+                $resource->isavailable = 'Pris'; // La ressource est maintenant attribuée
                 $resource->date_attribution = now();
+
+                // Mettre à jour le détenteur de la ressource
+                if (!empty($requestModel->id_beneficiary)) {
+                    $resource->id_user_holder = $requestModel->id_beneficiary;
+                }
+
                 $resource->save();
             }
         }
 
         return response()->json(['message' => 'Validation created successfully!', 'validation' => $validation], 201);
+    }
+
+    private function createNotification($id_user, $message, $id_requests = [])
+    {
+        try {
+            // Prepare the data payload
+            $data = [
+                'message' => $message,
+                'count' => count($id_requests),
+                'requests' => $id_requests,
+            ];
+
+            // Create a new notification entry
+            Notification::create([
+                'id_user' => $id_user,
+                'event_type' => 'validation_update',
+                'data' => json_encode($data),
+                'message' => $message, // Explicitly set the message
+                'resolved_at' => null, // Indicate that this notification is unresolved
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to create notification for user $id_user: " . $e->getMessage());
+        }
     }
 
     // Update a specific validation

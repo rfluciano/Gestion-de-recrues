@@ -95,8 +95,6 @@ class ResourceController extends Controller
             'id_user_holder' => 'nullable|exists:useraccount,matricule',
             'id_user_chief' => 'required|exists:useraccount,matricule',
             'label' => 'required|string|max:255',
-            'access_login' => 'nullable|string|max:255',
-            'access_password' => 'nullable|string|max:255',
             'discriminator' => 'required|string',
             'description' => 'nullable|string|max:255',
         ]);
@@ -108,7 +106,7 @@ class ResourceController extends Controller
         try {
             // Définir automatiquement isavailable en fonction de id_user_holder
             $data = $request->all();
-            $data['isavailable'] = $request->input('id_user_holder') ? false : true;
+            $data['isavailable'] = $request->input('id_user_holder') ? 'Pris' : 'Libre';
 
             $resource = Resource::create($data);
             return response()->json(['message' => 'Resource created successfully.', 'resource' => $resource], 201);
@@ -126,8 +124,6 @@ class ResourceController extends Controller
             'id_user_holder' => 'nullable|exists:useraccount,matricule',
             'id_user_chief' => 'required|exists:useraccount,matricule',
             'label' => 'required|string|max:255',
-            'access_login' => 'nullable|string|max:255',
-            'access_password' => 'nullable|string|max:255',
             'discriminator' => 'required|string',
             'description' => 'nullable|string|max:255',
         ]);
@@ -175,8 +171,6 @@ class ResourceController extends Controller
             'resources.*.id_user_holder' => 'nullable|exists:useraccount,matricule',
             'resources.*.id_user_chief' => 'required|exists:useraccount,matricule',
             'resources.*.label' => 'required|string|max:255',
-            'resources.*.access_login' => 'nullable|string|max:255',
-            'resources.*.access_password' => 'nullable|string|max:255',
             'resources.*.discriminator' => 'required|string',
             'resources.*.isavailable' => 'required|boolean',
             'resources.*.description' => 'nullable|string|max:255',
@@ -209,4 +203,24 @@ class ResourceController extends Controller
             return response()->json(['message' => 'Failed to retrieve resources.', 'error' => $e->getMessage()], 500);
         }
     }
+    public function getAvailableResources()
+    {
+        try {
+            $resources = DB::table('resources')
+            ->where('isavailable', "Libre")
+            ->get();
+ 
+            return response()->json($resources, 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve resources: ' . $e->getMessage());
+    
+            return response()->json([
+                'message' => 'Failed to retrieve resources.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    
+
+    
 }

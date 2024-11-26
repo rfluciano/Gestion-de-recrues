@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Validator;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Events\MessageSent;
 use App\Events\UserActionEvent;
+use App\Events\UserLoggedIn;
+
 
 class AuthController extends Controller
 {
@@ -16,11 +18,10 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'matricule' => 'required|string|unique:employees,matricule',
+            'matricule' => 'required|string|unique:useraccount,matricule',
             'username' => 'required|string|unique:useraccount',
             'password' => 'required|string|min:6',
             'discriminator' => 'required|string|in:admin,unitychief,recruit',
-            'id_superior' => 'nullable|exists:useraccount,matricule',
             'remember_me' => 'boolean',
         ]);
         
@@ -35,7 +36,6 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
             'discriminator' => $request->discriminator,
             'isactive' => false,
-            'id_superior' => $request->id_superior,
             'remember_me' => $request->remember_me ?? false,
         ]);
 
@@ -131,6 +131,8 @@ class AuthController extends Controller
     $authenticatedUser->isactive = true;
     $authenticatedUser->save();
 
+    broadcast(new UserLoggedIn($user->name))->toOthers();
+
     // Return the authentication response
     return response()->json([
         'success' => true,
@@ -210,14 +212,68 @@ class AuthController extends Controller
         return response()->json(['status' => 'Message sent!']);
     }
 
-    // Method to get all users
-    public function getUsers()
+    public function show($id_user)
     {
-        $users = User::all(); // Retrieve all users from the database
+        // Retrieve the specific user with their associated employee, position, and unit
+        $user = User::with(['employee.position.unity'])
+            ->where('matricule', $id_user)
+            ->first();
+    
+        // Check if the user exists
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found'
+            ], 404);
+        }
+    
+        return response()->json([
+            'success' => true,
+            'user' => $user
+        ], 200);
+    }
 
+    public function getUsers(Request $request){
+        $users = User::all();
         return response()->json([
             'success' => true,
             'users' => $users
         ], 200);
     }
+
+    public function search(Request $request) {
+        try {
+            // Validate the input
+            $request->validate([
+                'query' => 'required|string|max:255',
+            ]);
+    
+            $query = $request->input('query');
+    
+            // Debug log
+            \Log::info('Search query received:', ['query' => $query]);
+    
+            // Handle empty query gracefully
+            if (!$query) {
+                return response()->json(['users' => []], 200);
+            }
+    
+            // Perform search
+            $users = User::where('matricule', 'like', "%{$query}%")
+                ->orWhere('username', 'like', "%{$query}%")
+                ->orWhere('discriminator', 'like', "%{$query}%")
+                ->get();
+    
+            // Debug log results
+            \Log::info('Search results:', ['results' => $users]);
+    
+            return response()->json(['users' => $users], 200);
+        } catch (\Exception $e) {
+            // Log error for debugging
+            \Log::error('Failed to search users:', ['error' => $e->getMessage()]);
+            
+            return response()->json(['message' => 'Failed to search users.', 'error' => $e->getMessage()], 500);
+        }
+    }    
+    
 }

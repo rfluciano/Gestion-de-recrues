@@ -36,6 +36,8 @@
         }
     },
     "scripts": {
+        "websockets": "php artisan websockets:serve",
+
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"

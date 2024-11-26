@@ -14,6 +14,8 @@ return [
     | Supported: "reverb", "pusher", "ably", "redis", "log", "null"
     |
     */
+    'default' => env('BROADCAST_DRIVER', 'pusher'),
+
 
     'default' => env('BROADCAST_CONNECTION', 'pusher'),
 

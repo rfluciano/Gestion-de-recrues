@@ -24,6 +24,7 @@ class Employee extends Model
         'firstname',
         'isequipped',
         'date_entry',
+        'id_superior'
     ];
 
     public function getWeeklyEmployeeCount()
@@ -95,6 +96,11 @@ class Employee extends Model
             // Format the matricule as 'YYYY-XXX' (e.g., '2024-002')
             return sprintf('%s-%03d', $year, $newNumber);
         });
+    }
+
+    public function subAccounts()
+    {
+        return $this->hasMany(Employee::class, 'id_superior', 'matricule');
     }
 
     

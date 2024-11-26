@@ -9,65 +9,140 @@ use Illuminate\Support\Facades\Log; // Import the Log facade
 use Exception;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use App\Models\Position; // Import Position model at the top if not already done
+use App\Models\Position;
+use App\Models\User;
+use App\Models\Notification;
 
 
 
 class EmployeeController extends Controller
 {
 
-public function create(Request $request)
-{
-    try {
-        // Validate incoming request data
-        $request->validate([
-            // 'id_user' => 'nullable|integer|exists:useraccount,matricule|unique:employees,id_user',
-            'id_position' => 'integer|exists:positions,id_position|unique:employees,id_position', // Fix: Unique check for id_position
-            'name' => 'required|string|max:255',
-            'firstname' => 'required|string|max:255',
-            'isequipped' => 'nullable|boolean', // Make isequipped nullable and optional
-            'date_entry' => 'required|date',
-        ]);
+        public function create(Request $request)
+        {
+            try {
+                // Validate incoming request data
+                $request->validate([
+                    'id_position' => 'required|integer|exists:positions,id_position', // Ensure position exists
+                    'name' => 'required|string|max:255',
+                    'firstname' => 'required|string|max:255',
+                    'isequipped' => 'nullable|boolean',
+                    'date_entry' => 'required|date',
+                    'id_superior' => 'nullable|string|exists:employees,matricule', // Ensure the superior exists if provided
+                ]);
         
-        // Create a new employee instance
-        $employee = new Employee();
-        // $employee->id_user = $request->id_user;
-        $employee->id_position = $request->id_position;
-        $employee->name = $request->name;
-        $employee->firstname = $request->firstname;
-        $employee->isequipped = $request->isequipped ?? false; // Default to false if not provided
-        $employee->date_entry = $request->date_entry;
+                // Fetch the position and check its availability
+                $position = Position::find($request->id_position);
+                if (!$position || !$position->isavailable) {
+                    return response()->json(['message' => 'This position is already assigned to another employee.'], 422);
+                }
         
+                // Create a new employee instance
+                $employee = new Employee();
+                $employee->id_position = $request->id_position;
+                $employee->name = $request->name;
+                $employee->firstname = $request->firstname;
+                $employee->isequipped = $request->isequipped ?? false;
+                $employee->date_entry = $request->date_entry;
+                $employee->id_superior = $request->id_superior; // Set the superior's matricule if provided
+        
+                // Save the employee (only proceed if successful)
+                if ($employee->save()) {
+                    // Update the isavailable field for the position
+                    $position->isavailable = false;
+                    $position->save();
+                }
+        
+                // Retrieve the superior (if any)
+                $superior = $employee->id_superior ? User::find($employee->id_superior) : null;
+        
+                // Retrieve all admin users
+                $admins = User::where('discriminator', 'admin')->get();
+        
+                // Create notifications
+                $notifications = [];
+        
+                // Notify the superior (if any)
+                if ($superior) {
+                    $notifications[] = [
+                        'id_user' => $superior->matricule,
+                        'event_type' => 'employee_added',
+                        'message' => "Vous avez ajouter un nouvelle employé ($employee->matriculle) dans votre équipe",
+                        'data' => json_encode([
+                            'table' => 'employee',
+                            'matricule' => $employee->matricule,
+                            'name' => $employee->name,
+                            'firstname' => $employee->firstname,
+                        ]),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+        
+                // Notify all admins
+                foreach ($admins as $admin) {
+                    $notifications[] = [
+                        'id_user' => $admin->matricule,
+                        'event_type' => 'employee_added',
+                        'message' => "L'utilisateur {$request->id_superior} a ajouté un nouvel employé dans son équipe" ,
+                        'data' => json_encode([
+                            'table' => 'employee',
+                            'matricule' => $employee->matricule,
+                            'name' => $employee->name,
+                            'firstname' => $employee->firstname,
+                        ]),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+        
+                // Insert notifications into the database
+                foreach ($notifications as $notificationData) {
+                    try {
+                        $notification = new Notification();
+                        $notification->id_user = $notificationData['id_user'];
+                        $notification->event_type = $notificationData['event_type'];
+                        $notification->message = $notificationData['message'];
+                        $notification->data = $notificationData['data'];
+                        $notification->created_at = $notificationData['created_at'];
+                        $notification->updated_at = $notificationData['updated_at'];
+                        $notification->save();
 
-        // Generate a unique matricule based on the date_entry year
-        $yearFromDateEntry = Carbon::parse($request->date_entry)->format('Y');
-        $employee->matricule = $this->generateUniqueMatricule($yearFromDateEntry);
+                        // Log success for each notification
+                        Log::info('Notification created successfully.', ['notification' => $notificationData]);
+                    } catch (\Exception $e) {
+                        // Log failure for individual notification
+                        Log::error('Failed to create notification: ' . $e->getMessage(), [
+                            'notification' => $notificationData,
+                        ]);
+                    }
+                }
 
-        // Save the employee
-        $employee->save();
+                
+        
+                return response()->json([
+                    'message' => 'Employee created successfully!',
+                    'Matricule' => $employee->matricule,
+                    'admins' => $admins,
+                    'superior' => $superior,
+                    'notifications_to_insert' => $notifications, // Include the notifications array
 
-        // Update the isavailable field for the position
-        $position = Position::find($request->id_position);
-        if ($position) {
-            $position->isavailable = false;
-            $position->save();
+                ], 201);
+            } catch (Exception $e) {
+                // Log the error message
+                Log::error('Employee creation failed: ' . $e->getMessage(), [
+                    'request' => $request->all(),
+                    'error' => $e,
+                ]);
+        
+                // Return an error response
+                return response()->json([
+                    'message' => 'Failed to create employee.',
+                    'error' => $e->getMessage(),
+                ], 500);
+            }
         }
-
-        return response()->json(['message' => 'Employee created successfully!', 'Matricule' => $employee->matricule], 201);
-    } catch (Exception $e) {
-        // Log the error message
-        Log::error('Employee creation failed: ' . $e->getMessage(), [
-            'request' => $request->all(),
-            'error' => $e,
-        ]);
-
-        if (Employee::where('id_position', $request->id_position)->exists()) {
-            return response()->json(['message' => 'This position is already assigned to another employee.'], 422);
-        }        
-        // Return an error response
-        return response()->json(['message' => 'Failed to create employee.', 'error' => $e->getMessage()], 500);
-    }
-}
+    
 
 
 
@@ -131,7 +206,6 @@ public function create(Request $request)
         $maxMatricule = Employee::where('matricule', 'like', "{$year}-%")
                                 ->orderBy('matricule', 'desc')
                                 ->first();
-
         if ($maxMatricule) {
             // Extract the last number from the matricule
             $lastNumber = (int) substr($maxMatricule->matricule, -3);
@@ -321,7 +395,23 @@ public function create(Request $request)
     
             return response()->json(['message' => 'Failed to retrieve employees.', 'error' => $e->getMessage()], 500);
         }
-    }    
+    }  
+    
+    
+    public function getBySuperior(Request $request, $id_superior)
+     {
+       try {
+            $employees = Employee::where('id_superior', $id_superior)->get();
+            return response()->json($employees, 200);
+       } catch (Exception $e) {
+        // Journaliser l'erreur et retourner une réponse
+        Log::error('Failed to retrieve employees: ' . $e->getMessage(), [
+            'error' => $e,
+        ]);
+
+        return response()->json(['message' => 'Failed to retrieve employees.', 'error' => $e->getMessage()], 500);
+    }
+    }
 
     public function search(Request $request)
     {

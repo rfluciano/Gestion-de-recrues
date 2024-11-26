@@ -12,11 +12,11 @@ class CreateResourcesTable extends Migration
             $table->id('id_resource'); // Auto-incrementing primary key
             $table->string('id_user_holder')->nullable()->constrained('useraccount', 'matricule')->onDelete('set null'); // Foreign key to User
             $table->string('label')->nullable(); // Label of the resource
-            $table->string('access_login')->nullable(); // Login for access
-            $table->string('access_password')->nullable(); // Password for access
+            // $table->string('access_login')->nullable(); // Login for access
+            // $table->string('access_password')->nullable(); // Password for access
             $table->string('discriminator'); // Not nullable discriminator
             $table->date('date_attribution')->nullable();
-            $table->boolean('isavailable');
+            $table->string('isavailable');
             $table->string('description')->nullable();
             $table->string('id_user_chief')->constrained('useraccount', 'matricule')->onDelete('set null'); // Foreign key to User
             $table->timestamps();

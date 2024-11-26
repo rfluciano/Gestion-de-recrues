@@ -14,10 +14,7 @@ class CreateUseraccountTable extends Migration
             $table->string('discriminator'); // Champ discriminant
             $table->boolean('isactive')->default(true); // Statut actif (par défaut à true)
             $table->boolean('remember_me')->default(false); // Option de mémorisation (par défaut à false)
-            $table->string('id_superior')->nullable(); // Référence à un utilisateur supérieur, même type que 'matricule'
-
-            // Définir la contrainte de clé étrangère pour id_superior
-            // $table->foreign('id_superior')->references('matricule')->on('useraccount')->onDelete('cascade');
+            // $table->string('id_superior')->nullable(); // Référence à un utilisateur supérieur, même type que 'matricule'
         });
     }
 

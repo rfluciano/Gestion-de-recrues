@@ -1,33 +1,32 @@
 <?php
-// app/Events/MyEvent.php
 
 namespace App\Events;
 
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class MyEvent implements ShouldBroadcast
+class UserLoggedIn
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $message;
+    /**
+     * Create a new event instance.
+     */
+    public $username;
 
-    public function __construct($message)
+    public function __construct($username)
     {
-        $this->message = $message;
+        $this->username = $username;
     }
 
     public function broadcastOn()
     {
-        return new Channel('ReverbChannel');
+        return new Channel('auth-channel');
     }
 
-    public function broadcastAs()
-    {
-        return 'ReverbChannel';
-    }
 }

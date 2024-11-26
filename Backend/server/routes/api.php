@@ -12,12 +12,17 @@ use App\Http\Controllers\Api\RequestController;
 use App\Http\Controllers\Api\UnityController;
 use App\Http\Controllers\Api\ValidationController;
 use App\Http\Controllers\Api\ResourceController;
+use App\Http\Controllers\Api\NotificationController;
 
 
+//------------------NOTIFICATION-------------------//
 
-// Route::get('/user', function (Request $request) {
-//     return $request->user();
-// })->middleware('auth:sanctum');
+Route::post('/notifications', [NotificationController::class, 'store']);
+Route::get('/notifications/{id_user}', [NotificationController::class, 'index']);
+Route::put('/notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead']);
+Route::put('/notifications/mark-all-as-read', [NotificationController::class, 'markAllAsRead']);
+Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+
 
 //------------------GOATS-------------------//
 
@@ -35,6 +40,8 @@ Route::group(['middleware' => ['auth:api']], function () {
 });
 Route::post('/send-message', [AuthController::class, 'sendMessage']);
 Route::get('users', [AuthController::class, 'getUsers']);
+Route::get('/users/search', [AuthController::class, 'search']);
+Route::get('users/{id_user}', [AuthController::class, 'show']);
 
 
 //----------------------BROADCAST-------------------------//
@@ -58,11 +65,15 @@ Route::put('/employee/update/{id}', [EmployeeController::class, 'update']);
 
 Route::get('/employee/search', [EmployeeController::class, 'search']);
 
+Route::get('/employee/filter', [EmployeeController::class, '']);
+
 // Route to disable an employee by ID (instead of delete)
 Route::put('/employee/disable/{id}', [EmployeeController::class, 'disable']);
 
 // Route to fetch employees with optional filters
 Route::get('/employee/show', [EmployeeController::class, 'show']);
+
+Route::get('/employee/chief/{id_superior}', [EmployeeController::class, 'getBySuperior']);
 
 Route::get('/employee/count', [EmployeeController::class, 'getEmployeeCounts']);
 
@@ -124,16 +135,18 @@ Route::prefix('position')->group(function () {
 
 Route::prefix('resource')->group(function () {
 
-    
+    // Static routes (placed before parameterized routes)
+    Route::get('/mandeha', [ResourceController::class, 'getAvailableResources']);
+    Route::get('/count', [ResourceController::class, 'resourceCounts']);
+    Route::get('/search', [ResourceController::class, 'search']);
+    Route::get('/chief/{chiefId}', [ResourceController::class, 'getResourcesByChief']);
+
     // Retrieve all resources
     Route::get('/', [ResourceController::class, 'index']);
 
     // Retrieve a specific resource by ID
     Route::get('/{id}', [ResourceController::class, 'show']);
 
-    Route::get('/count', [ResourceController::class, 'resourceCounts']);
-
-    Route::get('/search', [ResourceController::class, 'search']);
     // Create a new resource
     Route::post('/new', [ResourceController::class, 'create']);
 
@@ -145,10 +158,8 @@ Route::prefix('resource')->group(function () {
 
     // Import multiple resources in bulk
     Route::post('/import', [ResourceController::class, 'import']);
-
-    Route::get('/chief/{chiefId}', [ResourceController::class, 'getResourcesByChief']);
-
 });
+
 
 //---------------------REQUEST-------------------------//
 
@@ -158,6 +169,9 @@ Route::prefix('request')->group(function () {
 
     // Retrieve all requests
     Route::get('/', [RequestController::class, 'index']);
+
+    // Retrieve all filtered requests
+    Route::get('/filter', [RequestController::class, 'filterRequests']);
 
     // Research all requests
     Route::get('/search', [RequestController::class, 'search']);

@@ -10,27 +10,32 @@ use Illuminate\Support\Facades\Log;
 class PositionController extends Controller
 {
     // Create a new position
-    public function create(Request $request)
-    {
-        try {
-            $request->validate([
-                'id_unity' => 'required|integer|exists:unities,id_unity', // Ensure the unity exists
-                'title' => 'required|string|max:255',
-                'isavailable' => 'required|boolean',
-            ]);
+public function create(Request $request)
+{
+    try {
+        $request->validate([
+            'id_unity' => 'required|integer|exists:unities,id_unity', // Ensure the unity exists
+            'title' => 'required|string|max:255',
+        ]);
 
-            $position = Position::create([
-                'id_unity' => $request->id_unity,
-                'title' => $request->title,
-                'isavailable' => $request->isavailable, // Corrected here
-            ]);            
+        $position = Position::create([
+            'id_unity' => $request->id_unity,
+            'title' => $request->title, // Corrected: Added missing comma
+            'isavailable' => true, // Initialize isavailable to true
+        ]);
 
-            return response()->json(['message' => 'Position created successfully!', 'position' => $position], 201);
-        } catch (\Exception $e) {
-            Log::error('Failed to create position: ' . $e->getMessage());
-            return response()->json(['message' => 'Failed to create position.', 'error' => $e->getMessage()], 500);
-        }
+        return response()->json([
+            'message' => 'Position created successfully!',
+            'position' => $position
+        ], 201);
+    } catch (\Exception $e) {
+        Log::error('Failed to create position: ' . $e->getMessage());
+        return response()->json([
+            'message' => 'Failed to create position.',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
 
     // Get a list of all positions
     public function index()
