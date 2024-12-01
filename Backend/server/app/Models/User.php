@@ -42,10 +42,7 @@ class User extends Authenticatable implements JWTSubject
         return $this->hasMany(Resource::class, 'id_user_chief', 'matricule');
     }
 
-    public function Possess_resource()
-    {
-        return $this->hasMany(Resource::class, 'id_user_holder', 'matricule');
-    }
+
 
 
     public function employee()

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Position;
 use Illuminate\Support\Facades\Log;
+use App\Events\MyEvent;
 
 class PositionController extends Controller
 {
@@ -24,10 +25,15 @@ public function create(Request $request)
             'isavailable' => true, // Initialize isavailable to true
         ]);
 
+        event(new MyEvent('Position', 'created'));
+        // event(new MyEvent('Notification', 'created'));
         return response()->json([
             'message' => 'Position created successfully!',
             'position' => $position
         ], 201);
+
+        
+
     } catch (\Exception $e) {
         Log::error('Failed to create position: ' . $e->getMessage());
         return response()->json([
@@ -78,6 +84,7 @@ public function create(Request $request)
             $position->delete();
 
             return response()->json(['message' => 'Position deleted successfully!']);
+            event(new MyEvent('Position', 'deleted'));
         } catch (\Exception $e) {
             Log::error('Failed to delete position: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to delete position.', 'error' => $e->getMessage()], 500);
@@ -129,5 +136,34 @@ public function create(Request $request)
             return response()->json(['message' => 'Failed to perform search.', 'error' => $e->getMessage()], 500);
         }
     }
+
+    public function getAvailablePosition(Request $request)
+    {
+        try {
+            // Récupérer toutes les positions disponibles
+            $availablePositions = Position::where('isavailable', true)->get();
+    
+            // Vérifier s'il y a des résultats
+            if ($availablePositions->isEmpty()) {
+                return response()->json([
+                    'position' => 'Aucun poste disponible'
+                ], 404);
+            }
+    
+            // Retourner les positions disponibles
+            return response()->json([
+                'message' => 'Positions disponibles récupérées avec succès.',
+                'positions' => $availablePositions
+            ], 200);
+        } catch (\Exception $e) {
+            // Gérer les erreurs
+            Log::error('Erreur lors de la récupération des positions disponibles : ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Erreur lors de la récupération des positions disponibles.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
 
 }

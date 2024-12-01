@@ -10,7 +10,7 @@ class CreateResourcesTable extends Migration
     {
         Schema::create('resources', function (Blueprint $table) {
             $table->id('id_resource'); // Auto-incrementing primary key
-            $table->string('id_user_holder')->nullable()->constrained('useraccount', 'matricule')->onDelete('set null'); // Foreign key to User
+            $table->string('id_holder')->nullable()->constrained('employee', 'matricule')->onDelete('set null'); // Foreign key to User
             $table->string('label')->nullable(); // Label of the resource
             // $table->string('access_login')->nullable(); // Login for access
             // $table->string('access_password')->nullable(); // Password for access

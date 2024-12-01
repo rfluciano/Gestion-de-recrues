@@ -12,138 +12,176 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Position;
 use App\Models\User;
 use App\Models\Notification;
+use App\Events\MyEvent;
 
 
 
 class EmployeeController extends Controller
 {
 
-        public function create(Request $request)
-        {
-            try {
-                // Validate incoming request data
-                $request->validate([
-                    'id_position' => 'required|integer|exists:positions,id_position', // Ensure position exists
-                    'name' => 'required|string|max:255',
-                    'firstname' => 'required|string|max:255',
-                    'isequipped' => 'nullable|boolean',
-                    'date_entry' => 'required|date',
-                    'id_superior' => 'nullable|string|exists:employees,matricule', // Ensure the superior exists if provided
-                ]);
-        
-                // Fetch the position and check its availability
-                $position = Position::find($request->id_position);
-                if (!$position || !$position->isavailable) {
-                    return response()->json(['message' => 'This position is already assigned to another employee.'], 422);
-                }
-        
-                // Create a new employee instance
-                $employee = new Employee();
-                $employee->id_position = $request->id_position;
-                $employee->name = $request->name;
-                $employee->firstname = $request->firstname;
-                $employee->isequipped = $request->isequipped ?? false;
-                $employee->date_entry = $request->date_entry;
-                $employee->id_superior = $request->id_superior; // Set the superior's matricule if provided
-        
-                // Save the employee (only proceed if successful)
-                if ($employee->save()) {
-                    // Update the isavailable field for the position
-                    $position->isavailable = false;
-                    $position->save();
-                }
-        
-                // Retrieve the superior (if any)
-                $superior = $employee->id_superior ? User::find($employee->id_superior) : null;
-        
-                // Retrieve all admin users
-                $admins = User::where('discriminator', 'admin')->get();
-        
-                // Create notifications
-                $notifications = [];
-        
-                // Notify the superior (if any)
-                if ($superior) {
-                    $notifications[] = [
-                        'id_user' => $superior->matricule,
-                        'event_type' => 'employee_added',
-                        'message' => "Vous avez ajouter un nouvelle employé ($employee->matriculle) dans votre équipe",
-                        'data' => json_encode([
-                            'table' => 'employee',
-                            'matricule' => $employee->matricule,
-                            'name' => $employee->name,
-                            'firstname' => $employee->firstname,
-                        ]),
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                }
-        
-                // Notify all admins
-                foreach ($admins as $admin) {
-                    $notifications[] = [
-                        'id_user' => $admin->matricule,
-                        'event_type' => 'employee_added',
-                        'message' => "L'utilisateur {$request->id_superior} a ajouté un nouvel employé dans son équipe" ,
-                        'data' => json_encode([
-                            'table' => 'employee',
-                            'matricule' => $employee->matricule,
-                            'name' => $employee->name,
-                            'firstname' => $employee->firstname,
-                        ]),
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                }
-        
-                // Insert notifications into the database
-                foreach ($notifications as $notificationData) {
-                    try {
-                        $notification = new Notification();
-                        $notification->id_user = $notificationData['id_user'];
-                        $notification->event_type = $notificationData['event_type'];
-                        $notification->message = $notificationData['message'];
-                        $notification->data = $notificationData['data'];
-                        $notification->created_at = $notificationData['created_at'];
-                        $notification->updated_at = $notificationData['updated_at'];
-                        $notification->save();
-
-                        // Log success for each notification
-                        Log::info('Notification created successfully.', ['notification' => $notificationData]);
-                    } catch (\Exception $e) {
-                        // Log failure for individual notification
-                        Log::error('Failed to create notification: ' . $e->getMessage(), [
-                            'notification' => $notificationData,
-                        ]);
-                    }
-                }
-
-                
-        
-                return response()->json([
-                    'message' => 'Employee created successfully!',
-                    'Matricule' => $employee->matricule,
-                    'admins' => $admins,
-                    'superior' => $superior,
-                    'notifications_to_insert' => $notifications, // Include the notifications array
-
-                ], 201);
-            } catch (Exception $e) {
-                // Log the error message
-                Log::error('Employee creation failed: ' . $e->getMessage(), [
-                    'request' => $request->all(),
-                    'error' => $e,
-                ]);
-        
-                // Return an error response
-                return response()->json([
-                    'message' => 'Failed to create employee.',
-                    'error' => $e->getMessage(),
-                ], 500);
-            }
-        }
+    public function create(Request $request)
+    {
+        try {
+            // Log the incoming request data
+            Log::info('Received request for employee creation.', ['request' => $request->all()]);
     
+            // Validate incoming request data
+            $request->validate([
+                'id_position' => 'nullable|integer|exists:positions,id_position',
+                'name' => 'nullable|string|max:255',
+                'firstname' => 'nullable|string|max:255',
+                'isequipped' => 'nullable|boolean',
+                'date_entry' => 'required|date',
+                'id_superior' => 'nullable|string|exists:employees,matricule',
+            ]);
+    
+            // Fetch the position and check its availability
+            $position = Position::find($request->id_position);
+            if (!$position || !$position->isavailable) {
+                Log::warning('Position is unavailable or not found.', ['id_position' => $request->id_position]);
+                return response()->json(['message' => 'This position is already assigned to another employee.'], 422);
+            }
+            Log::info('Position validated and available.', ['position' => $position]);
+    
+            // Generate the matricule based on the date_entry
+            $matricule = $this->generateMatricule($request->date_entry);
+            Log::info('Generated matricule.', ['matricule' => $matricule]);
 
+            // Create a new employee instance
+            $employee = new Employee();
+            $employee->matricule = $matricule;
+            $employee->id_position = $request->id_position;
+            $employee->name = $request->name;
+            $employee->firstname = $request->firstname;
+            $employee->isequipped = $request->isequipped ?? false;
+            $employee->date_entry = $request->date_entry;
+            $employee->id_superior = $request->id_superior;
+            // Pass the entry date
+
+    
+            if ($employee->save()) {
+                Log::info('Employee created successfully.', ['employee' => $employee]);
+                
+                // Update the isavailable field for the position
+                $position->isavailable = false;
+                $position->save();
+                Log::info('Position availability updated.', ['position' => $position]);
+            }
+    
+            // Retrieve the superior (if any)
+            $superior = $employee->id_superior ? Employee::where('matricule', $employee->id_superior)->first() : null;
+            if ($superior) {
+                Log::info('Superior found.', ['superior' => $superior]);
+            } else {
+                Log::warning('Superior not found or not provided.', ['id_superior' => $employee->id_superior]);
+            }
+    
+            // Retrieve all admin users
+            $admins = User::where('discriminator', 'admin')->get();
+            Log::info('Admins retrieved.', ['admins' => $admins]);
+    
+            // Create notifications
+            $notifications = [];
+    
+            // Notify the superior (if any)
+            if ($superior) {
+                $notifications[] = [
+                    'id_user' => $superior->matricule,
+                    'event_type' => 'employee_added',
+                    'message' => "Vous avez ajouter un nouvelle employé ($employee->matricule) dans votre équipe",
+                    'data' => json_encode([
+                        'table' => 'employee',
+                        'matricule' => $employee->matricule,
+                        'name' => $employee->name,
+                        'firstname' => $employee->firstname,
+                    ]),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+    
+            // Notify all admins
+            foreach ($admins as $admin) {
+                $notifications[] = [
+                    'id_user' => $admin->matricule,
+                    'event_type' => 'employee_added',
+                    'message' => "L'utilisateur {$request->id_superior} a ajouté un nouvel employé dans son équipe",
+                    'data' => json_encode([
+                        'table' => 'employee',
+                        'matricule' => $employee->matricule,
+                        'name' => $employee->name,
+                        'firstname' => $employee->firstname,
+                    ]),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+    
+            Log::info('Notifications prepared.', ['notifications' => $notifications]);
+    
+            // Insert notifications into the database
+            foreach ($notifications as $notificationData) {
+                try {
+                    $notification = new Notification();
+                    $notification->id_user = $notificationData['id_user'];
+                    $notification->event_type = $notificationData['event_type'];
+                    $notification->message = $notificationData['message'];
+                    $notification->data = $notificationData['data'];
+                    $notification->created_at = $notificationData['created_at'];
+                    $notification->updated_at = $notificationData['updated_at'];
+                    $notification->save();
+    
+                    Log::info('Notification created successfully.', ['notification' => $notificationData]);
+                } catch (\Exception $e) {
+                    Log::error('Failed to create notification.', ['error' => $e->getMessage(), 'notification' => $notificationData]);
+                }
+            }
+    
+            event(new MyEvent('Employee', 'created'));
+            event(new MyEvent('Notification', 'created'));
+            return response()->json([
+                'message' => 'Employee created successfully!',
+                'Matricule' => $employee->matricule,
+                'admins' => $admins,
+                'superior' => $superior,
+                'notifications_to_insert' => $notifications,
+            ], 201);
+        } catch (Exception $e) {
+            Log::error('Employee creation failed.', ['error' => $e->getMessage(), 'request' => $request->all()]);
+            return response()->json([
+                'message' => 'Failed to create employee.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function generateMatricule($entryDate = null)
+    {
+        // Use the year from entryDate if provided, otherwise default to the current year
+        $year = $entryDate ? Carbon::parse($entryDate)->format('Y') : Carbon::now()->format('Y');
+    
+        // Use DB transaction with a lock to avoid race conditions
+        return \DB::transaction(function () use ($year) {
+            // Lock the employees table while generating matricule to avoid race conditions
+            $lastMatricule = Employee::where('matricule', 'like', "{$year}-%")
+                ->orderBy('matricule', 'desc')
+                ->lockForUpdate()
+                ->first();
+    
+            if ($lastMatricule) {
+                // Extract the last 3 digits from the matricule (e.g., '2023-001' -> '001')
+                $lastNumber = (int) substr($lastMatricule->matricule, -3);
+                // Increment the number
+                $newNumber = $lastNumber + 1;
+            } else {
+                // Start at 1 if no matricule for the year exists
+                $newNumber = 1;
+            }
+    
+            // Format the matricule as 'YYYY-XXX' (e.g., '2023-002')
+            return sprintf('%s-%03d', $year, $newNumber);
+        });
+    }    
 
 
     public function getEmployeeCounts()
@@ -200,49 +238,33 @@ class EmployeeController extends Controller
 
 
 
-    // Function to generate a unique matricule based on the given year
-    private function generateUniqueMatricule($year)
-    {
-        $maxMatricule = Employee::where('matricule', 'like', "{$year}-%")
-                                ->orderBy('matricule', 'desc')
-                                ->first();
-        if ($maxMatricule) {
-            // Extract the last number from the matricule
-            $lastNumber = (int) substr($maxMatricule->matricule, -3);
-            // Increment the number
-            $newNumber = $lastNumber + 1;
-        } else {
-            // Start at 1 if no matricule for the specified year exists
-            $newNumber = 1;
-        }
 
-        // Format the matricule as 'YYYY-XXX'
-        return sprintf('%s-%03d', $year, $newNumber);
-    }
-
-
-
-    public function show(Request $request)
+    public function show($matricule)
     {
         try {
-            // Optionally, you can apply filters based on query parameters
-            $employees = Employee::when($request->id_position, function($query) use ($request) {
-                    return $query->where('id_position', $request->id_position);
-                })
-                ->when($request->isequipped, function($query) use ($request) {
-                    return $query->where('isequipped', $request->isequipped);
-                })
-                ->get();
+            // Rechercher l'employé par matricule
+            $employee = Employee::where('matricule', $matricule)->first();
 
-            return response()->json(['employees' => $employees], 200);
+            // Si l'employé n'existe pas, retourner une erreur
+            if (!$employee) {
+                return response()->json([
+                    'message' => "Employee with matricule {$matricule} not found."
+                ], 404);
+            }
+
+            // Retourner les données de l'employé
+            return response()->json(['employee' => $employee], 200);
         } catch (Exception $e) {
-            Log::error('Failed to fetch employees: ' . $e->getMessage(), [
+            // Journaliser l'erreur et retourner une réponse
+            Log::error('Failed to fetch employee by matricule: ' . $e->getMessage(), [
+                'matricule' => $matricule,
                 'error' => $e,
             ]);
 
-            return response()->json(['message' => 'Failed to fetch employees.', 'error' => $e->getMessage()], 500);
+            return response()->json(['message' => 'Failed to fetch employee.', 'error' => $e->getMessage()], 500);
         }
     }
+
 
     public function update(Request $request, $id)
     {
@@ -271,6 +293,9 @@ class EmployeeController extends Controller
             // Save the updated employee information
             $employee->save();
 
+            event(new MyEvent('Employee', 'modified'));
+            event(new MyEvent('Notification', 'modified'));
+
             return response()->json(['message' => 'Employee updated successfully!', 'employee' => $employee], 200);
         } catch (Exception $e) {
             Log::error('Employee modification failed: ' . $e->getMessage(), [
@@ -291,6 +316,9 @@ class EmployeeController extends Controller
             // Update employee status to 'disabled'
             $employee->isequipped = false;
             $employee->save();
+
+            event(new MyEvent('Employee', 'modified'));
+            event(new MyEvent('Notification', 'modified'));
 
             return response()->json(['message' => 'Employee disabled successfully!'], 200);
         } catch (Exception $e) {
@@ -401,7 +429,7 @@ class EmployeeController extends Controller
     public function getBySuperior(Request $request, $id_superior)
      {
        try {
-            $employees = Employee::where('id_superior', $id_superior)->get();
+            $employees = Employee::with('position')->where('id_superior', $id_superior)->get();
             return response()->json($employees, 200);
        } catch (Exception $e) {
         // Journaliser l'erreur et retourner une réponse
@@ -444,6 +472,4 @@ class EmployeeController extends Controller
             return response()->json(['message' => 'Failed to search employees.', 'error' => $e->getMessage()], 500);
         }
     }
-
-
 }

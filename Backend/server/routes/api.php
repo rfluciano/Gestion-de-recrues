@@ -71,7 +71,7 @@ Route::get('/employee/filter', [EmployeeController::class, '']);
 Route::put('/employee/disable/{id}', [EmployeeController::class, 'disable']);
 
 // Route to fetch employees with optional filters
-Route::get('/employee/show', [EmployeeController::class, 'show']);
+Route::get('/employee/{matricule}', [EmployeeController::class, 'show']);
 
 Route::get('/employee/chief/{id_superior}', [EmployeeController::class, 'getBySuperior']);
 
@@ -120,6 +120,7 @@ Route::prefix('position')->group(function () {
 
     Route::get('/search', [PositionController::class, 'search']);
 
+    Route::get('/available', [PositionController::class, 'getAvailablePosition']);
     // Get a specific position by ID
     Route::get('/{id}', [PositionController::class, 'show']);
 
@@ -128,8 +129,9 @@ Route::prefix('position')->group(function () {
 
     // Delete a position
     Route::delete('/delete/{id}', [PositionController::class, 'delete']);
-});
 
+
+});
 
 //----------------------RESOURCE-----------------------//
 
@@ -206,8 +208,11 @@ Route::prefix('validation')->group(function () {
     // Retrieve a specific validation by ID
     Route::get('/{id}', [ValidationController::class, 'show']);
 
-    // Create a new validation
-    Route::post('/new', [ValidationController::class, 'create']);
+    // Validate an existing validation by ID
+    Route::post('/validate/{id_validation}', [ValidationController::class, 'approve']);
+
+    // Reject an existing validation by ID
+    Route::post('/reject/{id_validation}', [ValidationController::class, 'reject']);
 
     // Update a validation by ID
     Route::put('/{id}', [ValidationController::class, 'update']);
@@ -215,6 +220,7 @@ Route::prefix('validation')->group(function () {
     // Delete a validation by ID
     Route::delete('/{id}', [ValidationController::class, 'delete']);
 });
+
 
 
 //----------------------NOTIFICATION-------------------//

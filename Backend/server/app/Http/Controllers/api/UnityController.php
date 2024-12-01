@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Unity;
 use App\Models\Position;
 use Illuminate\Support\Facades\Log;
+use App\Events\MyEvent;
 
 
 class UnityController extends Controller
@@ -26,6 +27,8 @@ class UnityController extends Controller
                 'type' => $request->type,
                 'title' => $request->title,
             ]);
+            event(new MyEvent('Position', 'created'));
+
 
             return response()->json(['message' => 'Unity created successfully!', 'unity' => $unity], 201);
         } catch (\Exception $e) {
@@ -78,6 +81,9 @@ class UnityController extends Controller
                 'title' => $request->title ?? $unity->title,
             ]);
 
+            event(new MyEvent('Unity', 'modified'));
+
+
             return response()->json(['message' => 'Unity updated successfully!', 'unity' => $unity]);
         } catch (\Exception $e) {
             Log::error('Failed to update unity: ' . $e->getMessage());
@@ -93,6 +99,8 @@ class UnityController extends Controller
             $unity->delete();
 
             return response()->json(['message' => 'Unity deleted successfully!']);
+            event(new MyEvent('Unity', 'deleted'));
+
         } catch (\Exception $e) {
             Log::error('Failed to delete unity: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to delete unity.', 'error' => $e->getMessage()], 500);

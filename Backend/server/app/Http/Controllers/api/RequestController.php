@@ -12,6 +12,8 @@ use App\Models\Validation;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use App\Models\Notification;
+use App\Events\MyEvent;
+
  // Assuming this is the correct model
 
 
@@ -19,6 +21,7 @@ class RequestController extends Controller
 {
     public function create(Request $request)
     {
+        
         try {
             // Log the incoming request data
             Log::info('Request data received: ', $request->all());
@@ -102,6 +105,7 @@ class RequestController extends Controller
                 $this->createNotification($id_requester, 'Votre requête de ressource a été créée avec succès.', [$newRequest->id_request]);
             }
 
+            event(new MyEvent('Request', 'created'));
             return response()->json(['message' => 'Request created successfully!', 'request' => $newRequest], 201);
 
         } catch (\Exception $e) {
@@ -192,6 +196,8 @@ class RequestController extends Controller
                         'validation_date' => now(),
                         'delivery_date' => now(),
                     ]);
+                    $resource->isavailable = 'Pend';
+                    $resource->save();
                 } else {
                     Validation::create([
                         'id_validator' => $id_receiver,
@@ -201,6 +207,10 @@ class RequestController extends Controller
                         'delivery_date' => null,
                         'rejection_reason' => null,
                     ]);
+                    $resource->isavailable = 'Pris';
+                    // $resource->id_ = 'Pris';
+                    $resource->save();
+                    //$id_beneficiary->update his isequipped into true
                 }
                 
     
@@ -209,7 +219,9 @@ class RequestController extends Controller
                 $this->createNotification($id_requester, 'Votre requête de ressource a été créée avec succès.', [$newRequest->id_request]);
     
                 DB::commit();
-    
+                event(new MyEvent('Request', 'created'));
+                event(new MyEvent('Resource', 'Modified'));
+                event(new MyEvent('Notification', 'created'));
                 $responses[] = [
                     'id_resource' => $id_resource,
                     'status' => 'success',
@@ -314,7 +326,7 @@ class RequestController extends Controller
     public function show($id)
     {
         try {
-            $request = RequestModel::with(['requester', 'resource', 'validation'])->findOrFail($id);
+            $request = RequestModel::with(['requester', 'resource', 'validation', 'receiver', 'beneficiary'])->findOrFail($id);
 
             // Set validation to null if it's the default empty model
             if ($request->validation && !$request->validation->exists) {

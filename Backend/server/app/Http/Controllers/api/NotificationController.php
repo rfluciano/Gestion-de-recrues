@@ -34,7 +34,7 @@ class NotificationController extends Controller
     {
         $notification = Notification::findOrFail($id);
         $notification->update(['is_read' => true]);
-
+        event(new MyEvent('Notification', 'modified'));
         return response()->json(['message' => 'Notification marquée comme lue.']);
     }
 

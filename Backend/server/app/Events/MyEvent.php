@@ -1,33 +1,37 @@
 <?php
-// app/Events/MyEvent.php
-
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
-use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
-use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 
 class MyEvent implements ShouldBroadcast
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+  use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $message;
+    public $model; // Nom du modèle ou information pertinente sous forme de chaîne
+    public $action; // Action effectuée (e.g., "created", "updated", "deleted")
 
-    public function __construct($message)
+    /**
+     * Crée une nouvelle instance de l'événement.
+     *
+     * @param string $model  Nom du modèle concerné
+     * @param string $action Action effectuée sur le modèle
+     */
+    public function __construct(string $model, string $action)
     {
-        $this->message = $message;
+        $this->model = $model;
+        $this->action = $action;
     }
 
-    public function broadcastOn()
-    {
-        return new Channel('ReverbChannel');
-    }
+  public function broadcastOn()
+  {
+      return ['my-channel'];
+  }
 
-    public function broadcastAs()
-    {
-        return 'ReverbChannel';
-    }
+  public function broadcastAs()
+  {
+      return 'my-event';
+  }
 }

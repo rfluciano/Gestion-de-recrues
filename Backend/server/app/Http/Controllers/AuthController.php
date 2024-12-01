@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Validator;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Events\MessageSent;
 use App\Events\UserActionEvent;
-use App\Events\UserLoggedIn;
+use App\Events\ModelChangedEvent;
+use App\Events\MyEvent;
 
 
 class AuthController extends Controller
@@ -39,9 +40,8 @@ class AuthController extends Controller
             'remember_me' => $request->remember_me ?? false,
         ]);
 
-        event(new UserActionEvent($user, 'create'));
-
-        // $token = JWTAuth::fromUser($user);
+        
+        event(new MyEvent('User', 'created'));
 
         return response()->json([
             'success' => true,
@@ -60,7 +60,7 @@ class AuthController extends Controller
         $user->update($request->all());
 
         // Dispatch the event with 'update' action
-        event(new UserActionEvent($user, 'update'));
+        event(new MyEvent('User', 'update'));
 
         return response()->json(['message' => 'User updated successfully!', 'user' => $user], 200);
     }
@@ -78,7 +78,7 @@ class AuthController extends Controller
     
 
 
-    public function login(Request $request)
+  public function login(Request $request)
 {
     // Validate query (either username or matricule) and password input
     $validator = Validator::make($request->all(), [
@@ -131,8 +131,9 @@ class AuthController extends Controller
     $authenticatedUser->isactive = true;
     $authenticatedUser->save();
 
-    broadcast(new UserLoggedIn($user->name))->toOthers();
-
+// Broadcasting the event with the message "Hello, World!"
+    event(new MyEvent('User', 'modified'));
+    // event(new ModelChangedEvent('User', 'created'));
     // Return the authentication response
     return response()->json([
         'success' => true,

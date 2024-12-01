@@ -33,49 +33,92 @@ class ValidationController extends Controller
         }
     }
 
-    public function create(Request $request)
+    public function approve(Request $request, $id_validation)
     {
-        $validator = Validator::make($request->all(), [
-            'id_validator' => 'required|string|exists:useraccount,matricule',
-            'id_request' => 'required|integer|exists:requests,id_request',
-            'validation_date' => 'nullable|date',
-            'delivery_date' => 'nullable|date',
-            'status' => 'required|string|max:50',
-            'rejection_reason' => 'nullable|string',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 400);
-        }
-
-        // Créez la validation
-        $validation = Validation::create($request->all());
-
-        // Trouver la requête associée et la ressource concernée
-        $requestModel = RequestModel::find($request->id_request);
-        // Individual notifications for requester and receiver
-        $this->createNotification($request->id_validator, 'Vous avez traité la requête avec succès.', [$request->id_validator]);
-        $this->createNotification($requestModel->id_requester, 'Votre requête de ressource a été approvée avec succès.', [$requestModel->id_request]);
-        
-        if ($requestModel && $requestModel->id_resource) {
-            $resource = Resource::find($requestModel->id_resource);
-
-            if ($resource) {
-                // Mettre à jour les champs de la ressource
-                $resource->isavailable = 'Pris'; // La ressource est maintenant attribuée
-                $resource->date_attribution = now();
-
-                // Mettre à jour le détenteur de la ressource
-                if (!empty($requestModel->id_beneficiary)) {
-                    $resource->id_user_holder = $requestModel->id_beneficiary;
-                }
-
-                $resource->save();
+        try {
+            $validation = Validation::findOrFail($id_validation);
+    
+            $validator = Validator::make($request->all(), [
+                'id_request' => 'required|integer|exists:requests,id_request',
+                'id_validator' => 'required|string|exists:useraccount,matricule',
+                'delivery_date' => 'required|date',
+            ]);
+    
+            if ($validator->fails()) {
+                return response()->json($validator->errors(), 400);
             }
+    
+            // Update the validation
+            $validation->update([
+                'id_request' => $request->id_request,
+                'id_validator' => $request->id_validator,
+                'delivery_date' => $request->delivery_date,
+                'validation_date' => now(),
+                'status' => 'Approuvé',
+                'rejection_reason' => null, // Clear the rejection reason if it's being approved
+            ]);
+    
+            // Retrieve associated request and resource
+            $requestModel = RequestModel::find($request->id_request);
+            if ($requestModel && $requestModel->id_resource) {
+                $resource = Resource::find($requestModel->id_resource);
+    
+                if ($resource) {
+                    // Update the resource status
+                    $resource->isavailable = 'Pris';
+                    $resource->date_attribution = now();
+                    $resource->id_holder = $requestModel->id_beneficiary ?? null;
+                    $resource->save();
+                }
+            }
+    
+            // Notify the validator and requester
+            $this->createNotification($request->id_validator, 'Validation approuvée avec succès.', [$request->id_request]);
+            $this->createNotification($requestModel->id_requester, 'Votre requête de ressource a été approuvée.', [$request->id_request]);
+    
+            return response()->json(['message' => 'Validation approved successfully!', 'validation' => $validation], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to approve validation: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to approve validation.', 'error' => $e->getMessage()], 500);
         }
-
-        return response()->json(['message' => 'Validation created successfully!', 'validation' => $validation], 201);
     }
+    
+    public function reject(Request $request, $id_validation)
+    {
+        try {
+            $validation = Validation::findOrFail($id_validation);
+    
+            $validator = Validator::make($request->all(), [
+                'id_request' => 'required|integer|exists:requests,id_request',
+                'id_validator' => 'required|string|exists:useraccount,matricule',
+                'rejection_reason' => 'required|string',
+            ]);
+    
+            if ($validator->fails()) {
+                return response()->json($validator->errors(), 400);
+            }
+    
+            // Update the validation
+            $validation->update([
+                'id_request' => $request->id_request,
+                'id_validator' => $request->id_validator,
+                'validation_date' => now(),
+                'status' => 'Rejeté',
+                'rejection_reason' => $request->rejection_reason,
+                'delivery_date' => null, // Clear the delivery date if rejected
+            ]);
+    
+            // Notify the validator and requester
+            $this->createNotification($request->id_validator, 'Validation rejetée avec succès.', [$request->id_request]);
+            $this->createNotification(RequestModel::find($request->id_request)->id_requester, 'Votre requête de ressource a été rejetée.', [$request->id_request]);
+    
+            return response()->json(['message' => 'Validation rejected successfully!', 'validation' => $validation], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to reject validation: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to reject validation.', 'error' => $e->getMessage()], 500);
+        }
+    }
+    
 
     private function createNotification($id_user, $message, $id_requests = [])
     {

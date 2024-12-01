@@ -15,7 +15,7 @@ class Resource extends Model
     public $timestamps = true;
 
     protected $fillable = [
-        'id_user_holder',
+        'id_holder',
         'id_user_chief',
         'label',
         'discriminator',
@@ -31,7 +31,7 @@ class Resource extends Model
      */
     public function holder()
     {
-        return $this->belongsTo(User::class, 'id_user_holder');
+        return $this->belongsTo(Employee::class, 'id_holder');
     }
 
     // La relation avec le chef d'unité (id_user_chief)

@@ -57,21 +57,20 @@ class Employee extends Model
 
     public function resource()
     {
-        return $this->hasMany(Resource::class, 'id_resource');
+        return $this->hasMany(Resource::class, 'id_holder', 'matricule');
     }
     // Override the save method to customize Matricule generation
     public function save(array $options = [])
     {
-        // Generate the Matricule before saving
+        // Generate matricule if absent, using the entry date
         if (empty($this->matricule)) {
-            $this->matricule = $this->generateMatricule();
+            $this->matricule = $this->generateMatricule($this->date_entry);
         }
         return parent::save($options);
-    }
-
+    }    
 
     // Function to generate the personalized Matricule
-    private function generateMatricule()
+    public function generateMatricule($entryDate = null)
     {
         $year = Carbon::now()->format('Y'); // Get the current year
 
