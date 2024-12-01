@@ -106,6 +106,8 @@ class RequestController extends Controller
             }
 
             event(new MyEvent('Request', 'created'));
+            event(new MyEvent('Resource', 'modified'));
+
             return response()->json(['message' => 'Request created successfully!', 'request' => $newRequest], 201);
 
         } catch (\Exception $e) {
@@ -220,7 +222,7 @@ class RequestController extends Controller
     
                 DB::commit();
                 event(new MyEvent('Request', 'created'));
-                event(new MyEvent('Resource', 'Modified'));
+                event(new MyEvent('Resource', 'modified'));
                 event(new MyEvent('Notification', 'created'));
                 $responses[] = [
                     'id_resource' => $id_resource,
